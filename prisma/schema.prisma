@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+// ── Tenants ────────────────────────────────────────────────
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  domain    String   @unique
+  slug      String   @unique
+  plan      String   @default("basic")
+  is_active Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  storeConfig StoreConfig?
+  products    Product[]
+  categories  Category[]
+  orders      Order[]
+  customers   Customer[]
+  adminUsers  AdminUser[]
+  coupons     Coupon[]
+}
+
+// ── Store Config ───────────────────────────────────────────
+model StoreConfig {
+  id                 String  @id @default(uuid())
+  tenant_id          String  @unique
+  primary_color      String? @default("#2563EB")
+  font_family        String? @default("Inter")
+  hero_layout        String? @default("centered")
+  product_card_style String? @default("minimal")
+  logo_url           String?
+  store_tagline      String?
+  features_json      Json?
+  contact_json       Json?
+  seo_json           Json?
+  razorpay_key_id    String?
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+}
+
+// ── Categories ─────────────────────────────────────────────
+model Category {
+  id        String    @id @default(uuid())
+  tenant_id String
+  name      String
+  slug      String
+  createdAt DateTime  @default(now())
+
+  tenant   Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([tenant_id, slug])
+  @@index([tenant_id])
+}
+
+// ── Products ───────────────────────────────────────────────
+model Product {
+  id             String   @id @default(uuid())
+  tenant_id      String
+  category_id    String?
+  name           String
+  description    String?
+  price          Decimal  @db.Decimal(10, 2)
+  discount_price Decimal? @db.Decimal(10, 2)
+  stock          Int      @default(0)
+  images         String[]
+  is_active      Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [category_id], references: [id])
+  variants Variant[]
+
+  @@index([tenant_id])
+  @@index([tenant_id, is_active])
+}
+
+// ── Variants ───────────────────────────────────────────────
+model Variant {
+  id         String @id @default(uuid())
+  product_id String
+  tenant_id  String
+  label      String
+  options    Json
+
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@index([product_id])
+}
+
+// ── Orders ─────────────────────────────────────────────────
+model Order {
+  id             String   @id @default(uuid())
+  tenant_id      String
+  customer_id    String?
+  status         String   @default("pending")
+  total          Decimal  @db.Decimal(10, 2)
+  payment_status String   @default("pending")
+  items_json     Json
+  address_json   Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customer_id], references: [id])
+
+  @@index([tenant_id])
+  @@index([tenant_id, status])
+}
+
+// ── Customers ──────────────────────────────────────────────
+model Customer {
+  id        String   @id @default(uuid())
+  tenant_id String
+  name      String
+  email     String?
+  phone     String?
+  address   Json?
+  createdAt DateTime @default(now())
+
+  tenant Tenant  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@unique([tenant_id, email])
+  @@index([tenant_id])
+}
+
+// ── Admin Users ────────────────────────────────────────────
+model AdminUser {
+  id            String   @id @default(uuid())
+  tenant_id     String
+  email         String
+  password_hash String
+  role          String   @default("admin")
+  createdAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, email])
+  @@index([tenant_id])
+}
+
+// ── Coupons ────────────────────────────────────────────────
+model Coupon {
+  id          String    @id @default(uuid())
+  tenant_id   String
+  code        String
+  type        String
+  value       Decimal   @db.Decimal(10, 2)
+  expiry      DateTime?
+  usage_limit Int?
+  used_count  Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, code])
+  @@index([tenant_id])
+}
