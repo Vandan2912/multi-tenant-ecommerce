@@ -1,152 +1,179 @@
 import { getTenantWithConfig } from "@/lib/tenant";
-import { getProductBySlug } from "@/lib/products";
+import { getProductById } from "@/lib/products";
+// import { AddToCartButton } from "@/components/AddToCartButton";
+import { VariantSelector } from "@/components/VariantSelector";
 import { notFound } from "next/navigation";
-import { AddToCartButton } from "@/components/AddToCartButton";
 
 type Props = { params: Promise<{ id: string }> };
 
 export default async function ProductDetailPage({ params }: Props) {
-    const { id } = await params;
+  const { id } = await params;
 
-    let tenant;
-    try {
-        tenant = await getTenantWithConfig();
-    } catch {
-        notFound();
-    }
+  let tenant;
+  try {
+    tenant = await getTenantWithConfig();
+  } catch {
+    notFound();
+  }
 
-    const product = await getProductBySlug(tenant.id, id);
-    if (!product) notFound();
+  const product = await getProductById(tenant.id, id);
+  if (!product) notFound();
 
-    const primaryColor = tenant.storeConfig?.primary_color ?? "#2563EB";
-    const inStock = product.stock > 0;
+  const primaryColor = tenant.storeConfig?.primary_color ?? "#2563EB";
+  const specs = product.specs_json as Record<string, string> | null;
 
-    const hasDiscount =
-        product.discount_price !== null &&
-        Number(product.discount_price) < Number(product.price);
+  // Lowest active price for display
+  const activeVariants = product.variants.filter((v) => v.is_active);
+  const prices = activeVariants.map((v) =>
+    v.discount_price ? Number(v.discount_price) : Number(v.price),
+  );
+  const lowestPrice = prices.length ? Math.min(...prices) : 0;
+  const highestPrice = prices.length ? Math.max(...prices) : 0;
+  const priceRange = lowestPrice !== highestPrice;
 
-    const displayPrice = hasDiscount
-        ? Number(product.discount_price)
-        : Number(product.price);
-
-    const discountPercent = hasDiscount
-        ? Math.round(
-            ((Number(product.price) - Number(product.discount_price)) /
-                Number(product.price)) *
-            100
-        )
-        : null;
-
-    return (
-        <div className="max-w-5xl mx-auto px-4 py-12">
-            {/* Back */}
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-12">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-2 text-sm mb-8 flex-wrap">
+        <a href="/products" className="text-gray-400 hover:underline">
+          Products
+        </a>
+        {product.category?.parent && (
+          <>
+            <span className="text-gray-300">/</span>
             <a
-                href="/products"
-                className="text-sm font-medium hover:underline mb-8 inline-block"
-                style={{ color: primaryColor }}
+              href={`/products?category=${product.category.parent.slug}`}
+              className="text-gray-400 hover:underline"
             >
-                ← Back to Products
+              {product.category.parent.name}
             </a>
+          </>
+        )}
+        {product.category && (
+          <>
+            <span className="text-gray-300">/</span>
+            <a
+              href={`/products?category=${product.category.slug}`}
+              className="text-gray-400 hover:underline"
+            >
+              {product.category.name}
+            </a>
+          </>
+        )}
+        <span className="text-gray-300">/</span>
+        <span className="text-gray-600">{product.name}</span>
+      </nav>
 
-            <div className="grid md:grid-cols-2 gap-10 mt-4">
-                {/* Image */}
-                <div className="rounded-2xl overflow-hidden bg-gray-100 aspect-square">
-                    {product.images[0] ? (
-                        <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-300 text-6xl">
-                            📦
-                        </div>
-                    )}
-                </div>
-
-                {/* Details */}
-                <div className="flex flex-col gap-4">
-                    {product.category && (
-                        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-                            {product.category.name}
-                        </p>
-                    )}
-
-                    <h1 className="text-3xl font-bold text-gray-800 leading-tight">
-                        {product.name}
-                    </h1>
-
-                    {/* Price */}
-                    <div className="flex items-center gap-3">
-                        <span className="text-3xl font-bold" style={{ color: primaryColor }}>
-                            ₹{displayPrice.toLocaleString("en-IN")}
-                        </span>
-                        {hasDiscount && (
-                            <>
-                                <span className="text-xl text-gray-400 line-through">
-                                    ₹{Number(product.price).toLocaleString("en-IN")}
-                                </span>
-                                <span
-                                    className="text-sm font-bold text-white px-2 py-1 rounded-full"
-                                    style={{ backgroundColor: primaryColor }}
-                                >
-                                    {discountPercent}% OFF
-                                </span>
-                            </>
-                        )}
-                    </div>
-
-                    {/* Stock */}
-                    <p className={`text-sm font-medium ${inStock ? "text-green-600" : "text-red-500"}`}>
-                        {inStock ? `✓ In Stock (${product.stock} left)` : "✗ Out of Stock"}
-                    </p>
-
-                    {/* Description */}
-                    {product.description && (
-                        <p className="text-gray-600 leading-relaxed">{product.description}</p>
-                    )}
-
-                    {/* Variants */}
-                    {product.variants.length > 0 && (
-                        <div className="space-y-3">
-                            {product.variants.map((v) => {
-                                const options = v.options as string[];
-                                return (
-                                    <div key={v.id}>
-                                        <p className="text-sm font-semibold text-gray-700 mb-2">{v.label}</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {options.map((opt) => (
-                                                <button
-                                                    key={opt}
-                                                    className="px-4 py-1.5 border border-gray-200 rounded-full text-sm hover:border-current transition-colors"
-                                                    style={{ color: primaryColor }}
-                                                >
-                                                    {opt}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-
-                    {/* CTA */}
-                    <AddToCartButton
-                        product={{
-                            id: product.id,
-                            name: product.name,
-                            price: Number(product.price),
-                            discountPrice: product.discount_price
-                                ? Number(product.discount_price)
-                                : null,
-                            image: product.images[0] ?? "",
-                            stock: product.stock,
-                        }}
-                        primaryColor={primaryColor}
-                    />
-                </div>
+      <div className="grid md:grid-cols-2 gap-10">
+        {/* Image */}
+        <div className="rounded-2xl overflow-hidden bg-gray-100 aspect-square">
+          {product.images[0] ? (
+            <img
+              src={product.images[0]}
+              alt={product.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-300 text-6xl">
+              📦
             </div>
-        </div >
-    );
+          )}
+        </div>
+
+        {/* Details */}
+        <div className="flex flex-col gap-5">
+          {/* Brand + category */}
+          <div className="flex items-center gap-3">
+            {product.brand && (
+              <a
+                href={`/products?brand=${product.brand.slug}`}
+                className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border"
+                style={{ color: primaryColor, borderColor: primaryColor }}
+              >
+                {product.brand.name}
+              </a>
+            )}
+            {product.category && (
+              <span className="text-xs text-gray-400">
+                {product.category.parent
+                  ? `${product.category.parent.name} › ${product.category.name}`
+                  : product.category.name}
+              </span>
+            )}
+          </div>
+
+          {/* Name */}
+          <h1 className="text-3xl font-bold text-gray-800 leading-tight">
+            {product.name}
+          </h1>
+
+          {/* Price */}
+          <div className="flex items-baseline gap-3">
+            <span
+              className="text-3xl font-bold"
+              style={{ color: primaryColor }}
+            >
+              {priceRange
+                ? `₹${lowestPrice.toLocaleString("en-IN")} – ₹${highestPrice.toLocaleString("en-IN")}`
+                : `₹${lowestPrice.toLocaleString("en-IN")}`}
+            </span>
+          </div>
+
+          {/* Description */}
+          {product.description && (
+            <p className="text-gray-600 leading-relaxed">
+              {product.description}
+            </p>
+          )}
+
+          {/* Variant selector + add to cart — client component */}
+          <VariantSelector
+            product={{
+              id: product.id,
+              name: product.name,
+              image: product.images[0] ?? "",
+              variants: product.variants.map((v) => ({
+                id: v.id,
+                name: v.name,
+                sku: v.sku,
+                price: Number(v.price),
+                discountPrice: v.discount_price
+                  ? Number(v.discount_price)
+                  : null,
+                stock: v.stock,
+                unit: v.unit,
+                options: v.options_json as Record<string, string>,
+                isActive: v.is_active,
+              })),
+            }}
+            primaryColor={primaryColor}
+          />
+        </div>
+      </div>
+
+      {/* Specifications */}
+      {specs && Object.keys(specs).length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-lg font-bold text-gray-800 mb-4">
+            Specifications
+          </h2>
+          <div className="bg-gray-50 rounded-2xl overflow-hidden">
+            {Object.entries(specs).map(([key, value], i) => (
+              <div
+                key={key}
+                className={`flex gap-4 px-6 py-3 text-sm ${
+                  i % 2 === 0 ? "bg-white" : "bg-gray-50"
+                }`}
+              >
+                <span className="w-40 shrink-0 text-gray-500 font-medium">
+                  {key}
+                </span>
+                <span className="text-gray-800">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

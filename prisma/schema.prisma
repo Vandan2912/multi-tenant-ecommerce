@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
 }
 
 // ── Tenants ────────────────────────────────────────────────
@@ -20,6 +20,7 @@ model Tenant {
   storeConfig StoreConfig?
   products    Product[]
   categories  Category[]
+  brands      Brand[]
   orders      Order[]
   customers   Customer[]
   adminUsers  AdminUser[]
@@ -44,13 +45,14 @@ model StoreConfig {
   tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 }
 
-// ── Categories ─────────────────────────────────────────────
-model Category {
-  id        String    @id @default(uuid())
+// ── Brands ─────────────────────────────────────────────────
+model Brand {
+  id        String   @id @default(uuid())
   tenant_id String
   name      String
   slug      String
-  createdAt DateTime  @default(now())
+  logo_url  String?
+  createdAt DateTime @default(now())
 
   tenant   Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
   products Product[]
@@ -59,39 +61,68 @@ model Category {
   @@index([tenant_id])
 }
 
+// ── Categories (self-relation for subcategories) ───────────
+model Category {
+  id        String   @id @default(uuid())
+  tenant_id String
+  name      String
+  slug      String
+  parent_id String?
+  createdAt DateTime @default(now())
+
+  tenant   Tenant     @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  parent   Category?  @relation("CategoryChildren", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children Category[] @relation("CategoryChildren")
+  products Product[]
+
+  @@unique([tenant_id, slug])
+  @@index([tenant_id])
+  @@index([tenant_id, parent_id])
+}
+
 // ── Products ───────────────────────────────────────────────
 model Product {
-  id             String   @id @default(uuid())
-  tenant_id      String
-  category_id    String?
-  name           String
-  description    String?
-  price          Decimal  @db.Decimal(10, 2)
-  discount_price Decimal? @db.Decimal(10, 2)
-  stock          Int      @default(0)
-  images         String[]
-  is_active      Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id          String   @id @default(uuid())
+  tenant_id   String
+  category_id String?
+  brand_id    String?
+  name        String
+  description String?
+  images      String[]
+  specs_json  Json?
+  is_active   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   tenant   Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
   category Category? @relation(fields: [category_id], references: [id])
+  brand    Brand?    @relation(fields: [brand_id], references: [id])
   variants Variant[]
 
   @@index([tenant_id])
   @@index([tenant_id, is_active])
+  @@index([tenant_id, category_id])
+  @@index([tenant_id, brand_id])
 }
 
 // ── Variants ───────────────────────────────────────────────
 model Variant {
-  id         String @id @default(uuid())
-  product_id String
-  tenant_id  String
-  label      String
-  options    Json
+  id             String   @id @default(uuid())
+  tenant_id      String
+  product_id     String
+  name           String
+  sku            String?
+  price          Decimal  @db.Decimal(10, 2)
+  discount_price Decimal? @db.Decimal(10, 2)
+  stock          Int      @default(0)
+  unit           String?
+  options_json   Json     @default("{}")
+  is_active      Boolean  @default(true)
+  createdAt      DateTime @default(now())
 
   product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
 
+  @@unique([tenant_id, product_id, name])
   @@index([tenant_id])
   @@index([product_id])
 }
