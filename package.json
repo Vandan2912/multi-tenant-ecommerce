@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev2": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -19,7 +20,8 @@
     "next-auth": "^5.0.0-beta.30",
     "pg": "^8.20.0",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
