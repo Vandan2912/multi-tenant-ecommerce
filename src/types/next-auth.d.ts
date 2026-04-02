@@ -9,6 +9,7 @@ declare module "next-auth" {
             tenantId: string;
             role: string;
             adminId: string;
+            isSuperAdmin: boolean;
         };
     }
 }

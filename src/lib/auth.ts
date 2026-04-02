@@ -14,15 +14,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.tenantId = (user as any).tenantId;
                 token.role = (user as any).role;
                 token.adminId = (user as any).adminId;
+                token.isSuperAdmin = (user as any).isSuperAdmin ?? false;
             }
             return token;
         },
         async session({ session, token }) {
-            if (token) {
-                session.user.tenantId = token.tenantId as string;
-                session.user.role = token.role as string;
-                session.user.adminId = token.adminId as string;
-            }
+            session.user.tenantId = token.tenantId as string;
+            session.user.role = token.role as string;
+            session.user.adminId = token.adminId as string;
+            session.user.isSuperAdmin = token.isSuperAdmin as boolean;
             return session;
         },
     },
@@ -35,12 +35,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             },
             async authorize(credentials) {
                 const { email, password, domain } = credentials as {
-                    email: string;
-                    password: string;
-                    domain: string;
+                    email: string; password: string; domain: string;
                 };
+                if (!email || !password) return null;
 
-                if (!email || !password || !domain) return null;
+                console.log("CRED", email, process.env.SUPER_ADMIN_EMAIL, password, process.env.SUPER_ADMIN_PASSWORD, domain)
+                // ── Super admin path ───────────────────────────────
+                if (email === process.env.SUPER_ADMIN_EMAIL) {
+                    if (password !== process.env.SUPER_ADMIN_PASSWORD) return null;
+                    return {
+                        id: "superadmin",
+                        email,
+                        adminId: "superadmin",
+                        tenantId: "",
+                        role: "superadmin",
+                        isSuperAdmin: true,
+                    };
+                }
+
+                // ── Tenant admin path ──────────────────────────────
+                if (!domain) return null;
 
                 const tenant = await db.tenant.findUnique({ where: { domain } });
                 if (!tenant || !tenant.is_active) return null;
@@ -48,7 +62,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 const admin = await db.adminUser.findFirst({
                     where: { tenant_id: tenant.id, email },
                 });
-
                 if (!admin) return null;
 
                 const valid = await bcrypt.compare(password, admin.password_hash);
@@ -60,6 +73,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     adminId: admin.id,
                     tenantId: tenant.id,
                     role: admin.role,
+                    isSuperAdmin: false,
                 };
             },
         }),

@@ -5,6 +5,11 @@ import { redirect } from "next/navigation";
 export default async function AdminDashboard() {
     const session = await auth();
     console.log(session)
+
+    if (session?.user?.isSuperAdmin) {
+        redirect("/superadmin");
+    }
+
     if (!session?.user?.tenantId) redirect("/admin/login");
 
     const tenantId = session.user.tenantId;

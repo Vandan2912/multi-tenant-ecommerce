@@ -10,6 +10,10 @@ export default async function AdminLayout({
 }) {
     const session = await auth();
 
+    if (session?.user?.isSuperAdmin) {
+        redirect("/superadmin");
+    }
+
     if (!session?.user?.tenantId) {
         redirect("/admin/login");
     }
