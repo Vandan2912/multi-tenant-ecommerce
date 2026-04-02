@@ -221,7 +221,7 @@ export default async function ProductsPage({ searchParams }: Props) {
             <div className="flex flex-wrap gap-2 mb-4">
               {params.search && (
                 <span className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-600">
-                  "{params.search}"
+                  &quot;{params.search}&quot;
                   <a
                     href={filterUrl({ search: undefined })}
                     className="ml-1 text-gray-400 hover:text-gray-600"

@@ -12,7 +12,10 @@ export default async function AdminProductsPage() {
     const [products, categories] = await Promise.all([
         db.product.findMany({
             where: { tenant_id: tenantId },
-            include: { category: true },
+            include: {
+                category: true,
+                variants: { orderBy: { price: "asc" } },
+            },
             orderBy: { createdAt: "desc" },
         }),
         db.category.findMany({
@@ -92,7 +95,9 @@ export default async function AdminProductsPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                            {products.map((p) => (
+                            {products.map((p) => {
+                                const firstVariant = p.variants[0];
+                                return (
                                 <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
@@ -122,23 +127,34 @@ export default async function AdminProductsPage() {
                                     </td>
                                     <td className="px-4 py-4">
                                         <div>
-                                            <p className="font-semibold text-gray-800">
-                                                ₹{Number(p.price).toLocaleString("en-IN")}
-                                            </p>
-                                            {p.discount_price && (
-                                                <p className="text-xs text-green-600">
-                                                    ₹{Number(p.discount_price).toLocaleString("en-IN")} sale
-                                                </p>
+                                            {firstVariant ? (
+                                                <>
+                                                    <p className="font-semibold text-gray-800">
+                                                        ₹{Number(firstVariant.price).toLocaleString("en-IN")}
+                                                    </p>
+                                                    {firstVariant.discount_price && (
+                                                        <p className="text-xs text-green-600">
+                                                            ₹{Number(firstVariant.discount_price).toLocaleString("en-IN")} sale
+                                                        </p>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <p className="text-gray-400 text-xs">No variants</p>
                                             )}
                                         </div>
                                     </td>
                                     <td className="px-4 py-4">
-                                        <span className={`font-semibold ${p.stock === 0 ? "text-red-500" :
-                                                p.stock <= 5 ? "text-amber-500" :
-                                                    "text-gray-700"
+                                        {firstVariant ? (
+                                            <span className={`font-semibold ${
+                                                firstVariant.stock === 0 ? "text-red-500" :
+                                                firstVariant.stock <= 5 ? "text-amber-500" :
+                                                "text-gray-700"
                                             }`}>
-                                            {p.stock}
-                                        </span>
+                                                {firstVariant.stock}
+                                            </span>
+                                        ) : (
+                                            <span className="text-gray-400">—</span>
+                                        )}
                                     </td>
                                     <td className="px-4 py-4">
                                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${p.is_active
@@ -157,7 +173,8 @@ export default async function AdminProductsPage() {
                                         </Link>
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 )}
