@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { OrderStatusBadge } from "@/components/admin/OrderStatusBadge";
+// import { OrderStatusBadge } from "@/components/admin/OrderStatusBadge";
 import { OrderStatusSelect } from "@/components/admin/OrderStatusSelect";
 
 type Props = {

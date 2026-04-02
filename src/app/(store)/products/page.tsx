@@ -1,4 +1,7 @@
-import { getTenant, getTenantWithConfig } from "@/lib/tenant";
+import {
+    // getTenant, 
+    getTenantWithConfig
+} from "@/lib/tenant";
 import { getProducts, getCategories } from "@/lib/products";
 import { ProductCard } from "@/components/ProductCard";
 import { notFound } from "next/navigation";

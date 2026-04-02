@@ -28,7 +28,7 @@ function OrderConfirmedContent() {
             <div>
                 <h1 className="text-2xl font-bold text-gray-800">Order Confirmed!</h1>
                 <p className="text-gray-500 mt-2 text-sm">
-                    Thank you for your order. We'll get it to you soon.
+                    Thank you for your order. We&apos;ll get it to you soon.
                 </p>
             </div>
 

@@ -32,6 +32,8 @@ export default function CheckoutPage() {
     const [loading, setLoading] = useState(false);
     const [primaryColor, setPrimaryColor] = useState("#2563EB");
     const [enableCOD, setEnableCOD] = useState(true);
+    // todo: fetch from store to enable COD
+    console.log(setEnableCOD)
 
     useEffect(() => {
         const color = getComputedStyle(document.documentElement)
