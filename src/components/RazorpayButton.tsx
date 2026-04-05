@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 type Item = {
   productId: string;
@@ -31,6 +30,7 @@ type Props = {
 
 declare global {
   interface Window {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Razorpay: any;
   }
 }
@@ -61,7 +61,6 @@ export function RazorpayButton({
   onError,
 }: Props) {
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   async function handlePay() {
     setLoading(true);
