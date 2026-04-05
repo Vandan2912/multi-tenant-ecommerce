@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ImageUploader } from "./ImageUploader";
 
 type Brand = {
   id: string;
@@ -111,12 +112,12 @@ export function BrandManager({ initialBrands }: { initialBrands: Brand[] }) {
               {loading ? "Adding..." : "Add Brand"}
             </button>
           </div>
-          <input
-            value={logoUrl}
-            onChange={(e) => setLogoUrl(e.target.value)}
-            placeholder="Logo URL (optional)"
-            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-200"
-          />
+          <div>
+            <label className="text-xs text-gray-500 mb-1.5 block">
+              Brand Logo
+            </label>
+            <ImageUploader value={logoUrl} onChange={setLogoUrl} />
+          </div>
           {name && (
             <p className="text-xs text-gray-400">
               Slug: <span className="font-mono">{slugify(name)}</span>

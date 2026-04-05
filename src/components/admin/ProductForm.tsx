@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ImageUploader } from "./ImageUploader";
 
 type Category = {
   id: string;
@@ -317,7 +318,17 @@ export function ProductForm({ categories, brands, initialData, mode }: Props) {
           </div>
         </div>
 
+        {/* Images */}
         <div>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
+            Product Images
+          </label>
+          <ImageUploader
+            value={fields.images}
+            onChange={(val) => setField("images", val)}
+          />
+        </div>
+        {/* <div>
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
             Image URLs
           </label>
@@ -331,7 +342,7 @@ export function ProductForm({ categories, brands, initialData, mode }: Props) {
             }
           />
           <p className="text-xs text-gray-400 mt-1">One URL per line</p>
-        </div>
+        </div> */}
 
         <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
           <div>
