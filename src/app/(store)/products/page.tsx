@@ -1,13 +1,21 @@
+import { Suspense } from "react";
 import { getTenantWithConfig } from "@/lib/tenant";
 import { getProducts, getCategoryTree, getBrands } from "@/lib/products";
 import { ProductCard } from "@/components/ProductCard";
+import { FilterSidebar } from "@/components/FilterSidebar";
+import { FilterDrawer } from "@/components/FilterDrawer";
+import { SortSelect } from "@/components/SortSelect";
 import { notFound } from "next/navigation";
 
 type Props = {
   searchParams: Promise<{
     category?: string;
-    brand?: string;
+    brands?: string;
     search?: string;
+    min?: string;
+    max?: string;
+    instock?: string;
+    sort?: string;
     page?: string;
   }>;
 };
@@ -16,261 +24,169 @@ export default async function ProductsPage({ searchParams }: Props) {
   const params = await searchParams;
 
   let tenant;
-  try {
-    tenant = await getTenantWithConfig();
-  } catch {
-    notFound();
-  }
+  try { tenant = await getTenantWithConfig(); }
+  catch { notFound(); }
 
   const config = tenant.storeConfig;
-  const cardStyle = (config?.product_card_style ?? "minimal") as
-    | "minimal"
-    | "detailed"
-    | "grid-dense";
   const primaryColor = config?.primary_color ?? "#2563EB";
+  const cardStyle = (config?.product_card_style ?? "minimal") as
+    "minimal" | "detailed" | "grid-dense";
 
-  const [{ products, total, pages }, categoryTree, brands] = await Promise.all([
+  // Parse filters from URL
+  const activeBrands = params.brands ? params.brands.split(",").filter(Boolean) : [];
+  const activeMin = params.min ? parseInt(params.min) : undefined;
+  const activeMax = params.max ? parseInt(params.max) : undefined;
+  const activeInStock = params.instock === "true";
+  const activeSort = (params.sort ?? "newest") as
+    "newest" | "price_asc" | "price_desc" | "name_asc";
+  const currentPage = params.page ? parseInt(params.page) : 1;
+
+  const [
+    { products, total, pages, priceRange },
+    categoryTree,
+    brands,
+  ] = await Promise.all([
     getProducts(tenant.id, {
       categorySlug: params.category,
-      brandSlug: params.brand,
+      brandSlugs: activeBrands,
       search: params.search,
-      page: params.page ? parseInt(params.page) : 1,
+      minPrice: activeMin,
+      maxPrice: activeMax,
+      inStock: activeInStock,
+      sort: activeSort,
+      page: currentPage,
     }),
     getCategoryTree(tenant.id),
     getBrands(tenant.id),
   ]);
 
-  const currentPage = parseInt(params.page ?? "1") || 1;
-
   const gridClass =
     cardStyle === "grid-dense"
-      ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"
-      : "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6";
+      ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"
+      : "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4 md:gap-6";
 
+  // Count active filters for badge
+  const activeCount =
+    (params.category ? 1 : 0) +
+    activeBrands.length +
+    (activeMin !== undefined ? 1 : 0) +
+    (activeMax !== undefined ? 1 : 0) +
+    (activeInStock ? 1 : 0);
+
+  // Build URL helper
   function filterUrl(overrides: Record<string, string | undefined>) {
     const p = new URLSearchParams();
     const merged = {
       category: params.category,
-      brand: params.brand,
+      brands: params.brands,
       search: params.search,
+      min: params.min,
+      max: params.max,
+      instock: params.instock,
+      sort: params.sort,
       ...overrides,
     };
-    Object.entries(merged).forEach(([k, v]) => {
-      if (v) p.set(k, v);
-    });
+    Object.entries(merged).forEach(([k, v]) => { if (v) p.set(k, v); });
     const s = p.toString();
     return `/products${s ? `?${s}` : ""}`;
   }
 
+  const sidebarProps = {
+    categoryTree,
+    brands,
+    priceRange,
+    primaryColor,
+    activeCategory: params.category,
+    activeBrands,
+    activeMin,
+    activeMax,
+    activeInStock,
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-10">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Products</h1>
-          <p className="text-sm text-gray-400 mt-1">{total} items</p>
+          <p className="text-sm text-gray-400 mt-0.5">{total} items</p>
         </div>
-        <form method="GET" action="/products" className="flex gap-2">
-          {params.category && (
-            <input type="hidden" name="category" value={params.category} />
-          )}
-          {params.brand && (
-            <input type="hidden" name="brand" value={params.brand} />
-          )}
-          <input
-            name="search"
-            defaultValue={params.search}
-            placeholder="Search products..."
-            className="border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none w-48"
-          />
-          <button
-            type="submit"
-            className="px-4 py-2 rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: primaryColor }}
-          >
-            Search
-          </button>
-        </form>
+        <div className="flex items-center gap-3">
+          {/* Mobile filter trigger */}
+          <Suspense>
+            <FilterDrawer {...sidebarProps} activeCount={activeCount} />
+          </Suspense>
+          {/* Sort */}
+          <Suspense>
+            <SortSelect current={activeSort} />
+          </Suspense>
+        </div>
       </div>
 
-      <div className="flex gap-8">
-        {/* Sidebar */}
-        <aside className="hidden md:block w-48 shrink-0 space-y-6">
-          {/* Categories */}
-          {categoryTree.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                Categories
-              </p>
-              <ul className="space-y-0.5">
-                <li>
-                  <a
-                    href={filterUrl({ category: undefined, page: undefined })}
-                    className={`block text-sm px-3 py-1.5 rounded-lg transition-colors ${
-                      !params.category
-                        ? "font-semibold text-white"
-                        : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                    style={
-                      !params.category ? { backgroundColor: primaryColor } : {}
-                    }
-                  >
-                    All
-                  </a>
-                </li>
-                {categoryTree.map((cat) => (
-                  <li key={cat.id}>
-                    <a
-                      href={filterUrl({ category: cat.slug, page: undefined })}
-                      className={`block text-sm px-3 py-1.5 rounded-lg transition-colors font-medium ${
-                        params.category === cat.slug
-                          ? "text-white"
-                          : "text-gray-700 hover:bg-gray-100"
-                      }`}
-                      style={
-                        params.category === cat.slug
-                          ? { backgroundColor: primaryColor }
-                          : {}
-                      }
-                    >
-                      {cat.name}
-                    </a>
-                    {/* Subcategories */}
-                    {cat.children.length > 0 && (
-                      <ul className="mt-0.5 ml-3 space-y-0.5">
-                        {cat.children.map((sub) => (
-                          <li key={sub.id}>
-                            <a
-                              href={filterUrl({
-                                category: sub.slug,
-                                page: undefined,
-                              })}
-                              className={`block text-sm px-3 py-1.5 rounded-lg transition-colors ${
-                                params.category === sub.slug
-                                  ? "text-white"
-                                  : "text-gray-500 hover:bg-gray-100"
-                              }`}
-                              style={
-                                params.category === sub.slug
-                                  ? { backgroundColor: primaryColor }
-                                  : {}
-                              }
-                            >
-                              {sub.name}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
+      {/* Active filter chips */}
+      {(activeCount > 0 || params.search) && (
+        <div className="flex flex-wrap gap-2 mb-5">
+          {params.search && (
+            <a href={filterUrl({ search: undefined })}
+              className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-700 hover:bg-gray-200">
+              🔍 "{params.search}" <span className="text-gray-400">×</span>
+            </a>
           )}
+          {params.category && (
+            <a href={filterUrl({ category: undefined })}
+              className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-700 hover:bg-gray-200">
+              📂 {params.category} <span className="text-gray-400">×</span>
+            </a>
+          )}
+          {activeBrands.map((b) => (
+            <a key={b}
+              href={filterUrl({
+                brands: activeBrands.filter((x) => x !== b).join(",") || undefined,
+              })}
+              className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-700 hover:bg-gray-200">
+              🏷️ {b} <span className="text-gray-400">×</span>
+            </a>
+          ))}
+          {(activeMin !== undefined || activeMax !== undefined) && (
+            <a href={filterUrl({ min: undefined, max: undefined })}
+              className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-700 hover:bg-gray-200">
+              💰 ₹{activeMin?.toLocaleString("en-IN") ?? priceRange.min} – ₹{activeMax?.toLocaleString("en-IN") ?? priceRange.max}
+              <span className="text-gray-400">×</span>
+            </a>
+          )}
+          {activeInStock && (
+            <a href={filterUrl({ instock: undefined })}
+              className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-700 hover:bg-gray-200">
+              ✅ In stock <span className="text-gray-400">×</span>
+            </a>
+          )}
+          <a href="/products"
+            className="px-3 py-1 text-xs text-red-500 hover:text-red-700 font-medium">
+            Clear all
+          </a>
+        </div>
+      )}
 
-          {/* Brands */}
-          {brands.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                Brands
-              </p>
-              <ul className="space-y-0.5">
-                <li>
-                  <a
-                    href={filterUrl({ brand: undefined, page: undefined })}
-                    className={`block text-sm px-3 py-1.5 rounded-lg transition-colors ${
-                      !params.brand
-                        ? "font-semibold text-white"
-                        : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                    style={
-                      !params.brand ? { backgroundColor: primaryColor } : {}
-                    }
-                  >
-                    All Brands
-                  </a>
-                </li>
-                {brands.map((b) => (
-                  <li key={b.id}>
-                    <a
-                      href={filterUrl({ brand: b.slug, page: undefined })}
-                      className={`block text-sm px-3 py-1.5 rounded-lg transition-colors ${
-                        params.brand === b.slug
-                          ? "text-white"
-                          : "text-gray-600 hover:bg-gray-100"
-                      }`}
-                      style={
-                        params.brand === b.slug
-                          ? { backgroundColor: primaryColor }
-                          : {}
-                      }
-                    >
-                      {b.name}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+      <div className="flex gap-8">
+        {/* Desktop sidebar */}
+        <aside className="hidden md:block w-52 shrink-0">
+          <Suspense>
+            <FilterSidebar {...sidebarProps} />
+          </Suspense>
         </aside>
 
-        {/* Grid */}
-        <div className="flex-1">
-          {/* Active filters */}
-          {(params.category || params.brand || params.search) && (
-            <div className="flex flex-wrap gap-2 mb-4">
-              {params.search && (
-                <span className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-600">
-                  &quot;{params.search}&quot;
-                  <a
-                    href={filterUrl({ search: undefined })}
-                    className="ml-1 text-gray-400 hover:text-gray-600"
-                  >
-                    ×
-                  </a>
-                </span>
-              )}
-              {params.category && (
-                <span className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-600">
-                  {params.category}
-                  <a
-                    href={filterUrl({ category: undefined })}
-                    className="ml-1 text-gray-400 hover:text-gray-600"
-                  >
-                    ×
-                  </a>
-                </span>
-              )}
-              {params.brand && (
-                <span className="flex items-center gap-1 px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-600">
-                  {params.brand}
-                  <a
-                    href={filterUrl({ brand: undefined })}
-                    className="ml-1 text-gray-400 hover:text-gray-600"
-                  >
-                    ×
-                  </a>
-                </span>
-              )}
-              <a
-                href="/products"
-                className="px-3 py-1 text-xs text-red-500 hover:underline"
-              >
-                Clear all
-              </a>
-            </div>
-          )}
-
+        {/* Product grid */}
+        <div className="flex-1 min-w-0">
           {products.length === 0 ? (
             <div className="text-center py-24 text-gray-400">
               <p className="text-4xl mb-4">🛍️</p>
-              <p className="font-medium">No products found</p>
-              <a
-                href="/products"
-                className="mt-3 inline-block text-sm hover:underline"
-                style={{ color: primaryColor }}
-              >
-                Clear filters
+              <p className="font-medium text-lg">No products found</p>
+              <p className="text-sm mt-2">Try adjusting your filters</p>
+              <a href="/products"
+                className="mt-4 inline-block text-sm font-medium hover:underline"
+                style={{ color: primaryColor }}>
+                Clear all filters
               </a>
             </div>
           ) : (
@@ -288,23 +204,39 @@ export default async function ProductsPage({ searchParams }: Props) {
 
           {/* Pagination */}
           {pages > 1 && (
-            <div className="flex justify-center gap-2 mt-12">
-              {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-                <a
-                  key={p}
-                  href={filterUrl({ page: String(p) })}
-                  className={`w-9 h-9 flex items-center justify-center rounded-lg text-sm font-medium ${
-                    p === currentPage
-                      ? "text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                  style={
-                    p === currentPage ? { backgroundColor: primaryColor } : {}
-                  }
-                >
-                  {p}
+            <div className="flex justify-center gap-2 mt-12 flex-wrap">
+              {currentPage > 1 && (
+                <a href={filterUrl({ page: String(currentPage - 1) })}
+                  className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+                  ← Prev
                 </a>
-              ))}
+              )}
+              {Array.from({ length: pages }, (_, i) => i + 1)
+                .filter((p) => Math.abs(p - currentPage) <= 2 || p === 1 || p === pages)
+                .reduce<(number | "...")[]>((acc, p, i, arr) => {
+                  if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("...");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "..." ? (
+                    <span key={`ellipsis-${i}`} className="px-3 py-2 text-gray-400 text-sm">…</span>
+                  ) : (
+                    <a key={p}
+                      href={filterUrl({ page: String(p) })}
+                      className={`w-10 h-10 flex items-center justify-center rounded-xl text-sm font-medium transition-colors ${p === currentPage ? "text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                      style={p === currentPage ? { backgroundColor: primaryColor } : {}}>
+                      {p}
+                    </a>
+                  )
+                )}
+              {currentPage < pages && (
+                <a href={filterUrl({ page: String(currentPage + 1) })}
+                  className="px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+                  Next →
+                </a>
+              )}
             </div>
           )}
         </div>
