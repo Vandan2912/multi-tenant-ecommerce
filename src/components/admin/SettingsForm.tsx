@@ -71,7 +71,7 @@ export function SettingsForm({ tenant, config }: Props) {
                     className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${value ? "bg-green-500" : "bg-gray-300"
                         }`}
                 >
-                    <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${value ? "translate-x-5" : "translate-x-0.5"
+                    <span className={`absolute top-0.5 left-0 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${value ? "translate-x-[22px]" : "translate-x-0.5"
                         }`} />
                 </button>
             </div>

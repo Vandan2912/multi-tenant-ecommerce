@@ -27,10 +27,10 @@ export function TenantToggle({
         <button
             onClick={toggle}
             disabled={loading}
-            className={`w-10 h-5 rounded-full relative transition-colors disabled:opacity-50 ${active ? "bg-green-500" : "bg-gray-600"
+            className={`w-11 h-6 rounded-full relative transition-colors shrink-0 disabled:opacity-50 ${active ? "bg-green-500" : "bg-gray-400"
                 }`}
         >
-            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${active ? "translate-x-5" : "translate-x-0.5"
+            <span className={`absolute top-0.5 left-0 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${active ? "translate-x-[22px]" : "translate-x-0.5"
                 }`} />
         </button>
     );

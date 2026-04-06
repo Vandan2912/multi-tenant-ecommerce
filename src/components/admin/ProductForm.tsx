@@ -420,8 +420,8 @@ export function ProductForm({ categories, brands, optionTypes, initialData, mode
             </div>
             <button type="button"
               onClick={() => setField("is_active", !fields.is_active)}
-              className={`w-11 h-6 rounded-full transition-colors relative ${fields.is_active ? "bg-green-500" : "bg-gray-300"}`}>
-              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${fields.is_active ? "translate-x-5" : "translate-x-0.5"}`} />
+              className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${fields.is_active ? "bg-green-500" : "bg-gray-300"}`}>
+              <span className={`absolute top-0.5 left-0 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${fields.is_active ? "translate-x-[22px]" : "translate-x-0.5"}`} />
             </button>
           </div>
         </div>
@@ -652,11 +652,11 @@ export function ProductForm({ categories, brands, optionTypes, initialData, mode
                             )}
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
-                            <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                            <label className="flex items-center gap-2 text-xs font-medium text-gray-500 cursor-pointer group">
                               <button type="button"
                                 onClick={() => setVariant(idx, "is_active", !v.is_active)}
-                                className={`w-8 h-4 rounded-full relative transition-colors ${v.is_active ? "bg-green-500" : "bg-gray-300"}`}>
-                                <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${v.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
+                                className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${v.is_active ? "bg-green-500" : "bg-gray-300"}`}>
+                                <span className={`absolute top-0.5 left-0 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${v.is_active ? "translate-x-[22px]" : "translate-x-0.5"}`} />
                               </button>
                               Active
                             </label>

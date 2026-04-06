@@ -387,22 +387,22 @@ export function PromoManager({
                         )}
 
                         {/* Toggles */}
-                        <div className="flex gap-6">
-                            <label className="flex items-center gap-2 cursor-pointer">
+                        <div className="flex gap-8">
+                            <label className="flex items-center gap-3 cursor-pointer group">
                                 <button type="button"
                                     onClick={() => setF("is_active", !form.is_active)}
-                                    className={`w-10 h-5 rounded-full relative transition-colors ${form.is_active ? "bg-green-500" : "bg-gray-300"}`}>
-                                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.is_active ? "translate-x-5" : "translate-x-0.5"}`} />
+                                    className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${form.is_active ? "bg-green-500" : "bg-gray-300"}`}>
+                                    <span className={`absolute top-0.5 left-0 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${form.is_active ? "translate-x-[22px]" : "translate-x-0.5"}`} />
                                 </button>
-                                <span className="text-sm text-gray-700">Active</span>
+                                <span className="text-sm font-medium text-gray-700">Active</span>
                             </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
+                            <label className="flex items-center gap-3 cursor-pointer group">
                                 <button type="button"
                                     onClick={() => setF("stackable", !form.stackable)}
-                                    className={`w-10 h-5 rounded-full relative transition-colors ${form.stackable ? "bg-green-500" : "bg-gray-300"}`}>
-                                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.stackable ? "translate-x-5" : "translate-x-0.5"}`} />
+                                    className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${form.stackable ? "bg-green-500" : "bg-gray-300"}`}>
+                                    <span className={`absolute top-0.5 left-0 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${form.stackable ? "translate-x-[22px]" : "translate-x-0.5"}`} />
                                 </button>
-                                <span className="text-sm text-gray-700">Stackable with other promos</span>
+                                <span className="text-sm font-medium text-gray-700">Stackable with other promos</span>
                             </label>
                         </div>
 
@@ -487,9 +487,9 @@ export function PromoManager({
                                     <button
                                         onClick={() => toggleActive(p.id, p.is_active)}
                                         disabled={togglingId === p.id}
-                                        className={`w-10 h-5 rounded-full relative transition-colors disabled:opacity-50 ${p.is_active ? "bg-green-500" : "bg-gray-300"}`}
+                                        className={`w-11 h-6 rounded-full relative transition-colors shrink-0 disabled:opacity-50 ${p.is_active ? "bg-green-500" : "bg-gray-300"}`}
                                     >
-                                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${p.is_active ? "translate-x-5" : "translate-x-0.5"}`} />
+                                        <span className={`absolute top-0.5 left-0 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${p.is_active ? "translate-x-[22px]" : "translate-x-0.5"}`} />
                                     </button>
                                     <button onClick={() => setExpandedId(expanded ? null : p.id)}
                                         className="text-xs text-blue-600 hover:underline">
