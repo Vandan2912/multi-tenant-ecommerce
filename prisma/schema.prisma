@@ -24,8 +24,8 @@ model Tenant {
   orders      Order[]
   customers   Customer[]
   adminUsers  AdminUser[]
-  coupons     Coupon[]
   optionTypes OptionType[]
+  promoCodes  PromoCode[]
 }
 
 // ── Store Config ───────────────────────────────────────────
@@ -215,20 +215,49 @@ model AdminUser {
   @@index([tenant_id])
 }
 
-// ── Coupons ────────────────────────────────────────────────
-model Coupon {
-  id          String    @id @default(uuid())
-  tenant_id   String
-  code        String
-  type        String
-  value       Decimal   @db.Decimal(10, 2)
-  expiry      DateTime?
-  usage_limit Int?
-  used_count  Int       @default(0)
-  createdAt   DateTime  @default(now())
+// ── Promo Codes ────────────────────────────────────────────
+model PromoCode {
+  id                   String    @id @default(uuid())
+  tenant_id            String
+  code                 String    // stored uppercase, trimmed
+  description          String?
+  discount_type        String    // percentage | fixed | free_shipping
+  discount_value       Decimal   @db.Decimal(10, 2)
+  minimum_order_value  Decimal?  @db.Decimal(10, 2)
+  maximum_discount     Decimal?  @db.Decimal(10, 2)  // cap for percentage
+  usage_limit          Int?      // global limit
+  usage_limit_per_user Int?      // per phone/email
+  used_count           Int       @default(0)
+  start_date           DateTime?
+  expiry_date          DateTime?
+  is_active            Boolean   @default(true)
+  applicable_products  String[]  // product IDs (empty = all)
+  applicable_categories String[] // category IDs (empty = all)
+  excluded_products    String[]  // product IDs to exclude
+  stackable            Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  tenant Tenant         @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  usages PromoUsage[]
 
   @@unique([tenant_id, code])
   @@index([tenant_id])
+  @@index([tenant_id, is_active])
+}
+
+// ── Promo Usage tracking (per user) ───────────────────────
+model PromoUsage {
+  id             String   @id @default(uuid())
+  promo_code_id  String
+  tenant_id      String
+  identifier     String   // phone or email
+  order_id       String?
+  discount_given Decimal  @db.Decimal(10, 2)
+  createdAt      DateTime @default(now())
+
+  promoCode PromoCode @relation(fields: [promo_code_id], references: [id], onDelete: Cascade)
+
+  @@index([promo_code_id])
+  @@index([tenant_id, identifier])
 }

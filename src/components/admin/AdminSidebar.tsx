@@ -12,7 +12,7 @@ const NAV = [
   { href: "/admin/options", label: "Options" },
   { href: "/admin/orders", label: "Orders" },
   { href: "/admin/customers", label: "Customers" },
-  { href: "/admin/coupons", label: "Coupons" },
+  { href: "/admin/promos", label: "Promo Codes" },
   { href: "/admin/settings", label: "Settings" },
 ];
 
@@ -43,8 +43,8 @@ export function AdminSidebar({
               key={href}
               href={href}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${active
-                  ? "bg-white/10 text-white"
-                  : "text-gray-400 hover:text-white hover:bg-white/5"
+                ? "bg-white/10 text-white"
+                : "text-gray-400 hover:text-white hover:bg-white/5"
                 }`}
             >
               {label}

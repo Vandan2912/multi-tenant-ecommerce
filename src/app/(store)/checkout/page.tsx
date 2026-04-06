@@ -5,6 +5,7 @@ import { useCart } from "@/lib/cart-context";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { RazorpayButton } from "@/components/RazorpayButton";
+import { PromoInput } from "@/components/PromoInput";
 
 type Field = {
   name: string;
@@ -42,6 +43,22 @@ export default function CheckoutPage() {
   const [enableCOD, setEnableCOD] = useState(true);
   // todo: fetch from store to enable COD
   console.log(setEnableCOD);
+
+  type PromoResult = {
+    promoCodeId: string;
+    code: string;
+    discount: number;
+    message: string;
+    isFreeShipping: boolean;
+    discountType: string;
+  };
+
+  const [appliedPromo, setAppliedPromo] = useState<PromoResult | null>(null);
+
+  const promoDiscount = appliedPromo?.discount ?? 0;
+  const isFreeShipping = appliedPromo?.isFreeShipping ?? false;
+  const shipping = isFreeShipping ? 0 : 0; // your shipping logic
+  const finalTotal = Math.max(0, total - promoDiscount + shipping);
 
   useEffect(() => {
     const color = getComputedStyle(document.documentElement)
@@ -117,7 +134,7 @@ export default function CheckoutPage() {
             pincode: fields.pincode,
           },
           paymentMethod: fields.paymentMethod,
-          couponCode: fields.couponCode || undefined,
+          promoCode: appliedPromo?.code ?? undefined,  // ← add this
         }),
       });
 
@@ -138,10 +155,9 @@ export default function CheckoutPage() {
   }
 
   const inputClass = (key: keyof Field) =>
-    `w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition-colors ${
-      errors[key]
-        ? "border-red-400 focus:ring-red-200"
-        : "border-gray-200 focus:ring-blue-100"
+    `w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition-colors ${errors[key]
+      ? "border-red-400 focus:ring-red-200"
+      : "border-gray-200 focus:ring-blue-100"
     }`;
 
   return (
@@ -262,11 +278,10 @@ export default function CheckoutPage() {
             <div className="grid sm:grid-cols-2 gap-3">
               {enableCOD && (
                 <label
-                  className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${
-                    fields.paymentMethod === "cod"
-                      ? "border-current"
-                      : "border-gray-200"
-                  }`}
+                  className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${fields.paymentMethod === "cod"
+                    ? "border-current"
+                    : "border-gray-200"
+                    }`}
                   style={{
                     color:
                       fields.paymentMethod === "cod" ? primaryColor : undefined,
@@ -292,11 +307,10 @@ export default function CheckoutPage() {
                 </label>
               )}
               <label
-                className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${
-                  fields.paymentMethod === "online"
-                    ? "border-current"
-                    : "border-gray-200"
-                }`}
+                className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${fields.paymentMethod === "online"
+                  ? "border-current"
+                  : "border-gray-200"
+                  }`}
                 style={{
                   color:
                     fields.paymentMethod === "online"
@@ -325,24 +339,23 @@ export default function CheckoutPage() {
             </div>
           </section>
 
-          {/* Coupon */}
+          {/* Promo code */}
           <section>
             <h2 className="font-semibold text-gray-700 mb-4 text-sm uppercase tracking-wider">
-              Coupon Code
+              Promo Code
             </h2>
-            <div className="flex gap-2">
-              <input
-                placeholder="Enter coupon code"
-                value={fields.couponCode}
-                onChange={(e) =>
-                  set("couponCode", e.target.value.toUpperCase())
-                }
-                className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 uppercase tracking-wider"
-              />
-            </div>
-            <p className="text-xs text-gray-400 mt-2">
-              Coupon will be applied when you place the order
-            </p>
+            <PromoInput
+              cartItems={items.map((i) => ({
+                productId: i.productId,
+                categoryId: null,
+                price: i.price,
+                quantity: i.quantity,
+              }))}
+              identifier={fields.phone || fields.email}
+              primaryColor={primaryColor}
+              onApply={setAppliedPromo}
+              applied={appliedPromo}
+            />
           </section>
         </div>
 
@@ -375,18 +388,32 @@ export default function CheckoutPage() {
             ))}
           </ul>
 
-          <div className="border-t border-gray-100 pt-4 space-y-2 text-sm">
+          <div className="space-y-2 text-sm">
             <div className="flex justify-between text-gray-500">
               <span>Subtotal</span>
               <span>₹{total.toLocaleString("en-IN")}</span>
             </div>
-            <div className="flex justify-between text-gray-500">
-              <span>Shipping</span>
-              <span className="text-green-600 font-medium">Free</span>
-            </div>
-            <div className="flex justify-between font-bold text-gray-800 text-base pt-1">
+            {promoDiscount > 0 && (
+              <div className="flex justify-between text-green-600 font-medium">
+                <span>Promo ({appliedPromo?.code})</span>
+                <span>-₹{promoDiscount.toLocaleString("en-IN")}</span>
+              </div>
+            )}
+            {appliedPromo?.isFreeShipping && (
+              <div className="flex justify-between text-green-600 font-medium">
+                <span>Shipping</span>
+                <span>Free</span>
+              </div>
+            )}
+            {!appliedPromo?.isFreeShipping && (
+              <div className="flex justify-between text-gray-500">
+                <span>Shipping</span>
+                <span className="text-green-600 font-medium">Free</span>
+              </div>
+            )}
+            <div className="border-t border-gray-100 pt-2 flex justify-between font-bold text-gray-800 text-base">
               <span>Total</span>
-              <span>₹{total.toLocaleString("en-IN")}</span>
+              <span>₹{finalTotal.toLocaleString("en-IN")}</span>
             </div>
           </div>
 

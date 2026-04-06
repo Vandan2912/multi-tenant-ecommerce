@@ -2,20 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { z } from "zod";
+import { validatePromoCode, recordPromoUsage } from "@/lib/promo";
 
 const orderSchema = z.object({
-  items: z
-    .array(
-      z.object({
-        productId: z.string(),
-        name: z.string(),
-        price: z.number(),
-        quantity: z.number().min(1),
-        image: z.string(),
-        variant: z.string().optional(),
-      }),
-    )
-    .min(1),
+  items: z.array(z.object({
+    productId: z.string(),
+    variantId: z.string().optional(),
+    categoryId: z.string().nullable().optional(),
+    name: z.string(),
+    price: z.number(),
+    quantity: z.number().min(1),
+    image: z.string(),
+    variant: z.string().optional(),
+  })).min(1),
   customer: z.object({
     name: z.string().min(1),
     email: z.string().email().optional().or(z.literal("")),
@@ -29,159 +28,132 @@ const orderSchema = z.object({
     pincode: z.string().min(6),
   }),
   paymentMethod: z.enum(["cod", "online"]),
-  couponCode: z.string().optional(),
+  promoCode: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
   try {
-    // ── Resolve tenant ─────────────────────────────────────
+    // ── Resolve tenant ───────────────────────────────────
     const headersList = await headers();
     const domain = headersList.get("x-tenant-domain");
 
-    if (!domain) {
+    if (!domain)
       return NextResponse.json({ error: "Unknown store" }, { status: 400 });
-    }
 
     const tenant = await db.tenant.findUnique({
       where: { domain },
       include: { storeConfig: true },
     });
-
-    if (!tenant || !tenant.is_active) {
+    if (!tenant || !tenant.is_active)
       return NextResponse.json({ error: "Store not found" }, { status: 404 });
-    }
 
-    // ── Validate body ──────────────────────────────────────
-    const body = await req.json();
-    const parsed = orderSchema.safeParse(body);
+    // ── Validate body ────────────────────────────────────
+    const parsed = orderSchema.safeParse(await req.json());
+    if (!parsed.success)
+      return NextResponse.json({ error: "Invalid data", details: parsed.error.flatten() }, { status: 422 });
 
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid data", details: parsed.error.flatten() },
-        { status: 422 },
-      );
-    }
+    const { items, customer, address, paymentMethod, promoCode } = parsed.data;
 
-    const { items, customer, address, paymentMethod, couponCode } = parsed.data;
-
-    // ── Verify products belong to this tenant ──────────────
-    const productIds = items.map((i) => i.productId);
+    // ── Verify products belong to this tenant ────────────
+    const productIds = [...new Set(items.map((i) => i.productId))];
     const products = await db.product.findMany({
-      where: {
-        id: { in: productIds },
-        tenant_id: tenant.id,
-        is_active: true,
-      },
+      where: { id: { in: productIds }, tenant_id: tenant.id, is_active: true },
+      include: { category: true },
     });
 
-    if (products.length !== productIds.length) {
-      return NextResponse.json(
-        { error: "One or more products not found" },
-        { status: 400 },
-      );
-    }
+    if (products.length !== productIds.length)
+      return NextResponse.json({ error: "One or more products not found" }, { status: 400 });
 
-    // ── Check stock at variant level ───────────────────────────
-    // items_json now includes variantId
-    for (const item of items) {
-      const product = products.find((p) => p.id === item.productId);
-      if (!product) {
-        return NextResponse.json(
-          { error: `Product not found: ${item.name}` },
-          { status: 400 },
-        );
-      }
-    }
+    // ── Validate promo code (server-side, never trust client) ──
+    let promoDiscount = 0;
+    let promoCodeRecord = null;
+    let isFreeShipping = false;
 
-    // ── Apply coupon if provided ───────────────────────────
-    let discountAmount = 0;
-    if (couponCode) {
-      const coupon = await db.coupon.findFirst({
-        where: {
-          tenant_id: tenant.id,
-          code: couponCode.toUpperCase(),
-          OR: [{ expiry: null }, { expiry: { gte: new Date() } }],
-        },
+    if (promoCode?.trim()) {
+      const identifier = customer.phone || customer.email || "";
+
+      const cartItemsForPromo = items.map((item) => {
+        const product = products.find((p) => p.id === item.productId);
+        return {
+          productId: item.productId,
+          categoryId: product?.category_id ?? null,
+          price: item.price,
+          quantity: item.quantity,
+        };
       });
 
-      if (coupon) {
-        const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-        if (coupon.type === "flat") {
-          discountAmount = Number(coupon.value);
-        } else {
-          discountAmount = Math.round((subtotal * Number(coupon.value)) / 100);
-        }
-        // Increment usage
-        await db.coupon.update({
-          where: { id: coupon.id },
-          data: { used_count: { increment: 1 } },
-        });
-      }
+      const promoResult = await validatePromoCode(
+        tenant.id,
+        promoCode,
+        cartItemsForPromo,
+        identifier,
+      );
+
+      if (!promoResult.valid)
+        return NextResponse.json({ error: promoResult.error }, { status: 400 });
+
+      promoDiscount = promoResult.discount;
+      promoCodeRecord = promoResult.promoCode;
+      isFreeShipping = promoResult.promoCode.discount_type === "free_shipping";
     }
 
-    // ── Calculate total ────────────────────────────────────
+    // ── Calculate total ──────────────────────────────────
     const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-    const total = Math.max(0, subtotal - discountAmount);
+    const shipping = isFreeShipping ? 0 : 0; // your shipping logic here
+    const total = Math.max(0, subtotal - promoDiscount + shipping);
 
-    // ── Upsert customer ────────────────────────────────────
+    // ── Upsert customer ──────────────────────────────────
     let customerRecord = null;
     if (customer.email) {
       customerRecord = await db.customer.upsert({
-        where: {
-          tenant_id_email: {
-            tenant_id: tenant.id,
-            email: customer.email,
-          },
-        },
-        update: {
-          name: customer.name,
-          phone: customer.phone,
-        },
+        where: { tenant_id_email: { tenant_id: tenant.id, email: customer.email } },
+        update: { name: customer.name, phone: customer.phone },
         create: {
           tenant_id: tenant.id,
           name: customer.name,
           email: customer.email,
           phone: customer.phone,
-          address: address,
+          address,
         },
       });
     }
 
-    // ── Create order ───────────────────────────────────────
+    // ── Create order ─────────────────────────────────────
     const order = await db.order.create({
       data: {
         tenant_id: tenant.id,
         customer_id: customerRecord?.id ?? null,
         status: paymentMethod === "cod" ? "confirmed" : "pending",
         payment_status: paymentMethod === "cod" ? "pending" : "awaiting",
-        total: total,
+        total,
         items_json: items,
-        address_json: address,
+        address_json: { ...address, name: customer.name, phone: customer.phone },
       },
     });
 
-    // ── Decrement stock ────────────────────────────────────────
-    await Promise.all(
-      items.map((item) =>
-        db.product
-          .update({
-            where: { id: item.productId },
-            data: {}, // stock now lives on variant — handled below
-          })
-          .catch(() => null),
-      ),
-    );
+    // ── Record promo usage ───────────────────────────────
+    if (promoCodeRecord && promoDiscount > 0) {
+      const identifier = customer.phone || customer.email || "";
+      await recordPromoUsage(
+        promoCodeRecord.id,
+        tenant.id,
+        identifier,
+        order.id,
+        promoDiscount,
+      );
+    }
 
     return NextResponse.json({
       orderId: order.id,
       total,
+      subtotal,
+      promoDiscount,
+      isFreeShipping,
       paymentMethod,
     });
+
   } catch (err) {
     console.error("[ORDER_CREATE]", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
