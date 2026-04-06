@@ -9,6 +9,7 @@ const NAV = [
   { href: "/admin/products", label: "Products" },
   { href: "/admin/categories", label: "Categories" },
   { href: "/admin/brands", label: "Brands" },
+  { href: "/admin/options", label: "Options" },
   { href: "/admin/orders", label: "Orders" },
   { href: "/admin/customers", label: "Customers" },
   { href: "/admin/coupons", label: "Coupons" },
@@ -41,11 +42,10 @@ export function AdminSidebar({
             <Link
               key={href}
               href={href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                active
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${active
                   ? "bg-white/10 text-white"
                   : "text-gray-400 hover:text-white hover:bg-white/5"
-              }`}
+                }`}
             >
               {label}
             </Link>

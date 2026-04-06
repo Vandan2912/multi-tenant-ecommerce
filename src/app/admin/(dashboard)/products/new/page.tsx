@@ -9,7 +9,7 @@ export default async function NewProductPage() {
 
   const tenantId = session.user.tenantId;
 
-  const [categories, brands] = await Promise.all([
+  const [categories, brands, optionTypes] = await Promise.all([
     db.category.findMany({
       where: { tenant_id: tenantId },
       orderBy: { name: "asc" },
@@ -19,12 +19,21 @@ export default async function NewProductPage() {
       where: { tenant_id: tenantId },
       orderBy: { name: "asc" },
     }),
+    db.optionType.findMany({
+      where: { tenant_id: tenantId },
+      orderBy: { position: "asc" },
+    }),
   ]);
 
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold text-gray-800 mb-8">Add Product</h1>
-      <ProductForm categories={categories} brands={brands} mode="create" />
+      <ProductForm
+        categories={categories}
+        brands={brands}
+        optionTypes={optionTypes.map((o) => ({ ...o, values_json: o.values_json as any[] }))}
+        mode="create"
+      />
     </div>
   );
 }

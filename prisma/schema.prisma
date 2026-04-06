@@ -25,6 +25,7 @@ model Tenant {
   customers   Customer[]
   adminUsers  AdminUser[]
   coupons     Coupon[]
+  optionTypes OptionType[]
 }
 
 // ── Store Config ───────────────────────────────────────────
@@ -94,10 +95,11 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tenant   Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  category Category? @relation(fields: [category_id], references: [id])
-  brand    Brand?    @relation(fields: [brand_id], references: [id])
-  variants Variant[]
+  tenant         Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  category       Category?       @relation(fields: [category_id], references: [id])
+  brand          Brand?          @relation(fields: [brand_id], references: [id])
+  variants       Variant[]
+  productOptions ProductOption[]
 
   @@index([tenant_id])
   @@index([tenant_id, is_active])
@@ -125,6 +127,40 @@ model Variant {
   @@unique([tenant_id, product_id, name])
   @@index([tenant_id])
   @@index([product_id])
+}
+
+// ── Option Types (tenant-level reusable definitions) ───────
+model OptionType {
+  id           String   @id @default(uuid())
+  tenant_id    String
+  name         String
+  type         String   // TEXT | COLOUR | SIZE | NUMBER | BOOLEAN
+  values_json  Json     // array of { id, label, hex?, order? }
+  position     Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  tenant         Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  productOptions ProductOption[]
+
+  @@unique([tenant_id, name])
+  @@index([tenant_id])
+}
+
+// ── Product Options (which option types a product uses) ────
+model ProductOption {
+  id                   String   @id @default(uuid())
+  product_id           String
+  tenant_id            String
+  option_type_id       String
+  position             Int      @default(0)
+  selected_values_json Json     // array of value IDs selected for this product
+
+  product    Product    @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  optionType OptionType @relation(fields: [option_type_id], references: [id], onDelete: Cascade)
+
+  @@unique([product_id, option_type_id])
+  @@index([product_id])
+  @@index([tenant_id])
 }
 
 // ── Orders ─────────────────────────────────────────────────

@@ -14,19 +14,25 @@ export default async function EditProductPage({
   const { id } = await params;
   const tenantId = session.user.tenantId;
 
-  const [product, categories, brands] = await Promise.all([
+  const [product, categories, brands, optionTypes] = await Promise.all([
     db.product.findFirst({
       where: { id, tenant_id: tenantId },
-      include: { variants: { orderBy: { createdAt: "asc" } } },
+      include: {
+        variants: { orderBy: { createdAt: "asc" } },
+        productOptions: {
+          orderBy: { position: "asc" },
+          include: { optionType: true },
+        },
+      },
     }),
     db.category.findMany({
-      where: { tenant_id: tenantId },
-      orderBy: { name: "asc" },
-      include: { parent: true },
+      where: { tenant_id: tenantId }, orderBy: { name: "asc" }, include: { parent: true },
     }),
     db.brand.findMany({
-      where: { tenant_id: tenantId },
-      orderBy: { name: "asc" },
+      where: { tenant_id: tenantId }, orderBy: { name: "asc" },
+    }),
+    db.optionType.findMany({
+      where: { tenant_id: tenantId }, orderBy: { position: "asc" },
     }),
   ]);
 
@@ -41,6 +47,7 @@ export default async function EditProductPage({
       <ProductForm
         categories={categories}
         brands={brands}
+        optionTypes={optionTypes.map((o) => ({ ...o, values_json: o.values_json as any[] }))}
         mode="edit"
         initialData={{
           id: product.id,
@@ -61,10 +68,18 @@ export default async function EditProductPage({
             discount_price: v.discount_price ? String(v.discount_price) : "",
             stock: String(v.stock),
             unit: v.unit ?? "piece",
-            options: Object.entries(
-              (v.options_json as Record<string, string>) ?? {},
-            ).map(([key, value]) => ({ key, value })),
+            options_json: (v.options_json ?? {}) as Record<string, string>,
             is_active: v.is_active,
+          })),
+          productOptions: product.productOptions.map((po) => ({
+            id: po.id,
+            option_type_id: po.option_type_id,
+            position: po.position,
+            selected_values_json: po.selected_values_json as string[],
+            optionType: {
+              ...po.optionType,
+              values_json: po.optionType.values_json as any[],
+            },
           })),
         }}
       />

@@ -131,15 +131,61 @@ export async function getProducts(tenantId: string, opts: FilterParams = {}) {
     ...(categoryIds.length > 0 && { category_id: { in: categoryIds } }),
     ...(brandSlugs.length > 0 && { brand: { slug: { in: brandSlugs } } }),
     ...(filteredProductIds && { id: { in: filteredProductIds } }),
-    ...(search && {
-      OR: [
-        { name: { contains: search, mode: "insensitive" } },
-        { description: { contains: search, mode: "insensitive" } },
-        { brand: { name: { contains: search, mode: "insensitive" } } },
-        { category: { name: { contains: search, mode: "insensitive" } } },
-      ],
-    }),
   };
+
+  // For text search, find product IDs via raw SQL (searches JSONB option values)
+  if (search) {
+    const q = search.trim().toLowerCase();
+    const matchingProducts = await db.$queryRaw<{ id: string }[]>`
+      SELECT DISTINCT p.id
+      FROM "Product" p
+      LEFT JOIN "Brand"    b ON b.id = p.brand_id
+      LEFT JOIN "Category" c ON c.id = p.category_id
+      WHERE
+        p.tenant_id = ${tenantId}
+        AND p.is_active = true
+        AND (
+          LOWER(p.name)        LIKE ${'%' + q + '%'}
+          OR LOWER(p.description) LIKE ${'%' + q + '%'}
+          OR LOWER(b.name)     LIKE ${'%' + q + '%'}
+          OR LOWER(c.name)     LIKE ${'%' + q + '%'}
+          OR EXISTS (
+            SELECT 1 FROM "Variant" v
+            WHERE v.product_id = p.id
+              AND v.is_active = true
+              AND LOWER(v.name) LIKE ${'%' + q + '%'}
+          )
+          OR EXISTS (
+            SELECT 1 FROM "Variant" v
+            WHERE v.product_id = p.id
+              AND v.is_active = true
+              AND EXISTS (
+                SELECT 1
+                FROM jsonb_each_text(v.options_json::jsonb) kv
+                WHERE LOWER(kv.value) LIKE ${'%' + q + '%'}
+              )
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM jsonb_each_text(p.specs_json::jsonb) kv
+            WHERE LOWER(kv.value) LIKE ${'%' + q + '%'}
+          )
+        )
+    `;
+
+    const searchIds = matchingProducts.map((r) => r.id);
+
+    if (searchIds.length === 0) {
+      return { products: [], total: 0, pages: 0, page, priceRange: await getPriceRange(tenantId) };
+    }
+
+    // Merge with existing filteredProductIds if any
+    productWhere.id = {
+      in: filteredProductIds
+        ? searchIds.filter((id) => filteredProductIds!.includes(id))
+        : searchIds,
+    };
+  }
 
   // Sort
   const orderBy: Prisma.ProductOrderByWithRelationInput =
@@ -210,40 +256,82 @@ export async function getProductById(tenantId: string, productId: string) {
 export async function searchProducts(tenantId: string, query: string, limit = 8) {
   if (!query || query.trim().length < 2) return [];
 
-  const products = await db.product.findMany({
-    where: {
-      tenant_id: tenantId,
-      is_active: true,
-      OR: [
-        { name: { contains: query, mode: "insensitive" } },
-        { description: { contains: query, mode: "insensitive" } },
-        { brand: { name: { contains: query, mode: "insensitive" } } },
-        { category: { name: { contains: query, mode: "insensitive" } } },
-      ],
-    },
-    include: {
-      brand: { select: { name: true } },
-      category: { select: { name: true } },
-      variants: {
-        where: { is_active: true },
-        orderBy: { price: "asc" },
-        take: 1,
-      },
-    },
-    take: limit,
-    orderBy: { createdAt: "desc" },
-  });
+  const q = query.trim().toLowerCase();
 
-  return products.map((p) => ({
-    id: p.id,
-    name: p.name,
-    brand: p.brand?.name ?? null,
-    category: p.category?.name ?? null,
-    image: p.images[0] ?? null,
-    price: p.variants[0]
-      ? (p.variants[0].discount_price
-        ? Number(p.variants[0].discount_price)
-        : Number(p.variants[0].price))
-      : null,
+  // Raw SQL — searches name, description, brand, category, AND variant option values in JSONB
+  const results = await db.$queryRaw<
+    {
+      id: string;
+      name: string;
+      images: string[];
+      brand_name: string | null;
+      category_name: string | null;
+      min_price: number | null;
+    }[]
+  >`
+    SELECT DISTINCT ON (p.id)
+      p.id,
+      p.name,
+      p.images,
+      b.name  AS brand_name,
+      c.name  AS category_name,
+      MIN(
+        CASE
+          WHEN v.discount_price IS NOT NULL THEN v.discount_price
+          ELSE v.price
+        END
+      ) OVER (PARTITION BY p.id) AS min_price
+    FROM "Product" p
+    LEFT JOIN "Brand"    b ON b.id = p.brand_id
+    LEFT JOIN "Category" c ON c.id = p.category_id
+    LEFT JOIN "Variant"  v ON v.product_id = p.id AND v.is_active = true
+    WHERE
+      p.tenant_id = ${tenantId}
+      AND p.is_active = true
+      AND (
+        -- Product name
+        LOWER(p.name) LIKE ${'%' + q + '%'}
+        -- Description
+        OR LOWER(p.description) LIKE ${'%' + q + '%'}
+        -- Brand name
+        OR LOWER(b.name) LIKE ${'%' + q + '%'}
+        -- Category name
+        OR LOWER(c.name) LIKE ${'%' + q + '%'}
+        -- Variant name (e.g. "Black / M")
+        OR EXISTS (
+          SELECT 1 FROM "Variant" v2
+          WHERE v2.product_id = p.id
+            AND v2.is_active = true
+            AND LOWER(v2.name) LIKE ${'%' + q + '%'}
+        )
+        -- Variant options_json values (e.g. {"Color":"Black","Size":"M"})
+        OR EXISTS (
+          SELECT 1 FROM "Variant" v3
+          WHERE v3.product_id = p.id
+            AND v3.is_active = true
+            AND EXISTS (
+              SELECT 1
+              FROM jsonb_each_text(v3.options_json::jsonb) kv
+              WHERE LOWER(kv.value) LIKE ${'%' + q + '%'}
+            )
+        )
+        -- Spec values (e.g. {"Material":"Cotton"})
+        OR EXISTS (
+          SELECT 1
+          FROM jsonb_each_text(p.specs_json::jsonb) kv
+          WHERE LOWER(kv.value) LIKE ${'%' + q + '%'}
+        )
+      )
+    ORDER BY p.id, p."createdAt" DESC
+    LIMIT ${limit}
+  `;
+
+  return results.map((r) => ({
+    id: r.id,
+    name: r.name,
+    brand: r.brand_name ?? null,
+    category: r.category_name ?? null,
+    image: r.images?.[0] ?? null,
+    price: r.min_price ?? null,
   }));
 }

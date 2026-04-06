@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
   if (!session?.user?.tenantId)
@@ -14,13 +14,11 @@ export async function PATCH(
   const tenantId = session.user.tenantId;
   const body = await req.json();
 
-  const existing = await db.product.findFirst({
-    where: { id, tenant_id: tenantId },
-  });
+  const existing = await db.product.findFirst({ where: { id, tenant_id: tenantId } });
   if (!existing)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Update product fields
+  // Update base product
   await db.product.update({
     where: { id },
     data: {
@@ -34,11 +32,45 @@ export async function PATCH(
     },
   });
 
-  // Handle variants
+  // Upsert product options
+  for (const po of body.productOptions ?? []) {
+    await db.productOption.upsert({
+      where: {
+        product_id_option_type_id: {
+          product_id: id,
+          option_type_id: po.option_type_id,
+        },
+      },
+      update: {
+        selected_values_json: po.selected_values_json,
+        position: po.position,
+      },
+      create: {
+        product_id: id,
+        tenant_id: tenantId,
+        option_type_id: po.option_type_id,
+        selected_values_json: po.selected_values_json,
+        position: po.position,
+      },
+    });
+  }
+
+  // Remove deselected options
+  const incomingOptionTypeIds = (body.productOptions ?? []).map((po: any) => po.option_type_id);
+  await db.productOption.deleteMany({
+    where: {
+      product_id: id,
+      option_type_id: { notIn: incomingOptionTypeIds },
+    },
+  });
+
+  // Handle variants — soft approach
+  const existingVariants = await db.variant.findMany({ where: { product_id: id } });
+  const existingMap = new Map(existingVariants.map((v) => [v.id, v]));
+
   for (const v of body.variants ?? []) {
-    if (v._delete && v.id) {
-      await db.variant.delete({ where: { id: v.id } });
-    } else if (v.id) {
+    if (v.id && existingMap.has(v.id)) {
+      // Update existing
       await db.variant.update({
         where: { id: v.id },
         data: {
@@ -52,7 +84,8 @@ export async function PATCH(
           is_active: v.is_active ?? true,
         },
       });
-    } else if (!v._delete) {
+    } else if (!v.id) {
+      // Create new
       await db.variant.create({
         data: {
           tenant_id: tenantId,
@@ -70,12 +103,22 @@ export async function PATCH(
     }
   }
 
+  // Mark variants not in incoming list as inactive (soft)
+  const incomingIds = (body.variants ?? []).filter((v: any) => v.id).map((v: any) => v.id);
+  await db.variant.updateMany({
+    where: {
+      product_id: id,
+      id: { notIn: incomingIds },
+    },
+    data: { is_active: false },
+  });
+
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
   if (!session?.user?.tenantId)
@@ -84,13 +127,10 @@ export async function DELETE(
   const { id } = await params;
   const tenantId = session.user.tenantId;
 
-  const existing = await db.product.findFirst({
-    where: { id, tenant_id: tenantId },
-  });
+  const existing = await db.product.findFirst({ where: { id, tenant_id: tenantId } });
   if (!existing)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Hard delete cascades to variants via schema
   await db.product.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }
