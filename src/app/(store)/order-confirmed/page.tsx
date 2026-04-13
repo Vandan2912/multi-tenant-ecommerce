@@ -49,17 +49,25 @@ function OrderConfirmedContent() {
                 </div>
             )}
 
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+                {orderId && (
+                    <Link
+                        href={`/orders/track?id=${orderId}`}
+                        className="px-6 py-2.5 rounded-full text-white text-sm font-semibold text-center"
+                        style={{ backgroundColor: primaryColor }}
+                    >
+                        Track Order
+                    </Link>
+                )}
                 <Link
                     href="/products"
-                    className="px-6 py-2.5 rounded-full text-white text-sm font-semibold"
-                    style={{ backgroundColor: primaryColor }}
+                    className="px-6 py-2.5 rounded-full border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 text-center"
                 >
                     Continue Shopping
                 </Link>
                 <Link
                     href="/"
-                    className="px-6 py-2.5 rounded-full border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50"
+                    className="px-6 py-2.5 rounded-full border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 text-center"
                 >
                     Go Home
                 </Link>
