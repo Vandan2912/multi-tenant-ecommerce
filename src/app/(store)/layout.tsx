@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getTenantWithConfig } from "@/lib/tenant";
 import { notFound } from "next/navigation";
 import { CartProvider } from "@/lib/cart-context";
+import { WishlistProvider } from "@/lib/wishlist-context";
 import { Navbar } from "@/components/Navbar";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -50,12 +51,14 @@ export default async function StoreLayout({
         } as React.CSSProperties}
       >
         <CartProvider>
-          <Navbar
-            storeName={tenant.name}
-            primaryColor={primaryColor}
-            logoUrl={config?.logo_url}
-          />
-          {children}
+          <WishlistProvider>
+            <Navbar
+              storeName={tenant.name}
+              primaryColor={primaryColor}
+              logoUrl={config?.logo_url}
+            />
+            {children}
+          </WishlistProvider>
         </CartProvider>
       </div>
     </>

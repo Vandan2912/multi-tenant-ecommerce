@@ -1,7 +1,7 @@
 import { getTenantWithConfig } from "@/lib/tenant";
 import { getProductById } from "@/lib/products";
-// import { AddToCartButton } from "@/components/AddToCartButton";
 import { VariantSelector } from "@/components/VariantSelector";
+import { WishlistButton } from "@/components/WishlistButton";
 import { notFound } from "next/navigation";
 
 type Props = { params: Promise<{ id: string }> };
@@ -102,10 +102,25 @@ export default async function ProductDetailPage({ params }: Props) {
             )}
           </div>
 
-          {/* Name */}
-          <h1 className="text-3xl font-bold text-gray-800 leading-tight">
-            {product.name}
-          </h1>
+          {/* Name + wishlist */}
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-3xl font-bold text-gray-800 leading-tight">
+              {product.name}
+            </h1>
+            <WishlistButton
+              item={{
+                id: product.id,
+                name: product.name,
+                image: product.images[0] ?? "",
+                price: activeVariants[0] ? Number(activeVariants[0].price) : 0,
+                discountPrice: activeVariants[0]?.discount_price
+                  ? Number(activeVariants[0].discount_price)
+                  : null,
+                variantCount: activeVariants.length,
+              }}
+              className="shrink-0 mt-1"
+            />
+          </div>
 
           {/* Price */}
           <div className="flex items-baseline gap-3">

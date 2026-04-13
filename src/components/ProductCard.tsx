@@ -19,6 +19,7 @@ type Props = {
   product: Product;
   style?: "minimal" | "detailed" | "grid-dense";
   primaryColor?: string;
+  wishlistButton?: React.ReactNode;
 };
 
 function getPrice(variants: Variant[]) {
@@ -87,6 +88,7 @@ export function ProductCard({
   product,
   style = "minimal",
   primaryColor = "#2563EB",
+  wishlistButton,
 }: Props) {
   const { price, discountPrice } = getPrice(product.variants);
   const totalStock = getTotalStock(product.variants);
@@ -122,6 +124,9 @@ export function ProductCard({
                 Out of Stock
               </span>
             </div>
+          )}
+          {wishlistButton && (
+            <div className="absolute bottom-2 right-2">{wishlistButton}</div>
           )}
         </div>
         <div className="mt-2 px-0.5">
@@ -168,6 +173,9 @@ export function ProductCard({
                 Out of Stock
               </span>
             </div>
+          )}
+          {wishlistButton && (
+            <div className="absolute bottom-3 right-3">{wishlistButton}</div>
           )}
         </div>
         <div className="p-4">
@@ -229,6 +237,9 @@ export function ProductCard({
               Out of Stock
             </span>
           </div>
+        )}
+        {wishlistButton && (
+          <div className="absolute bottom-2 right-2">{wishlistButton}</div>
         )}
       </div>
       <div className="mt-3">

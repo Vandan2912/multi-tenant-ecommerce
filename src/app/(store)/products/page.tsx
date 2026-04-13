@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { getTenantWithConfig } from "@/lib/tenant";
 import { getProducts, getCategoryTree, getBrands } from "@/lib/products";
 import { ProductCard } from "@/components/ProductCard";
+import { WishlistButton } from "@/components/WishlistButton";
 import { FilterSidebar } from "@/components/FilterSidebar";
 import { FilterDrawer } from "@/components/FilterDrawer";
 import { SortSelect } from "@/components/SortSelect";
@@ -191,14 +192,33 @@ export default async function ProductsPage({ searchParams }: Props) {
             </div>
           ) : (
             <div className={gridClass}>
-              {products.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  style={cardStyle}
-                  primaryColor={primaryColor}
-                />
-              ))}
+              {products.map((product) => {
+                const firstVariant = product.variants[0];
+                const price = firstVariant ? Number(firstVariant.price) : 0;
+                const discountPrice = firstVariant?.discount_price
+                  ? Number(firstVariant.discount_price)
+                  : null;
+                return (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    style={cardStyle}
+                    primaryColor={primaryColor}
+                    wishlistButton={
+                      <WishlistButton
+                        item={{
+                          id: product.id,
+                          name: product.name,
+                          image: product.images[0] ?? "",
+                          price,
+                          discountPrice,
+                          variantCount: product.variants.length,
+                        }}
+                      />
+                    }
+                  />
+                );
+              })}
             </div>
           )}
 
