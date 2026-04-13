@@ -64,6 +64,32 @@ export async function POST(req: NextRequest) {
     if (products.length !== productIds.length)
       return NextResponse.json({ error: "One or more products not found" }, { status: 400 });
 
+    // ── Validate stock availability ──────────────────────
+    const variantIds = items
+      .filter((i) => i.variantId)
+      .map((i) => i.variantId as string);
+
+    if (variantIds.length > 0) {
+      const variants = await db.variant.findMany({
+        where: { id: { in: variantIds }, tenant_id: tenant.id },
+        select: { id: true, stock: true, name: true },
+      });
+
+      for (const item of items) {
+        if (!item.variantId) continue;
+        const variant = variants.find((v) => v.id === item.variantId);
+        if (!variant) {
+          return NextResponse.json({ error: `Variant not found for "${item.name}"` }, { status: 400 });
+        }
+        if (variant.stock < item.quantity) {
+          return NextResponse.json(
+            { error: `Only ${variant.stock} unit(s) available for "${item.name}"` },
+            { status: 400 },
+          );
+        }
+      }
+    }
+
     // ── Validate promo code (server-side, never trust client) ──
     let promoDiscount = 0;
     let promoCodeRecord = null;
@@ -130,6 +156,20 @@ export async function POST(req: NextRequest) {
         address_json: { ...address, name: customer.name, phone: customer.phone },
       },
     });
+
+    // ── Decrement stock for COD orders ───────────────────
+    if (paymentMethod === "cod" && variantIds.length > 0) {
+      await db.$transaction(
+        items
+          .filter((i) => i.variantId)
+          .map((i) =>
+            db.variant.update({
+              where: { id: i.variantId! },
+              data: { stock: { decrement: i.quantity } },
+            }),
+          ),
+      );
+    }
 
     // ── Record promo usage ───────────────────────────────
     if (promoCodeRecord && promoDiscount > 0) {

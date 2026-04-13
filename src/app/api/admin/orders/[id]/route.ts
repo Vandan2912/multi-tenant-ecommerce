@@ -22,6 +22,39 @@ export async function PATCH(
         return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    // ── Restore stock when cancelling a confirmed order ──
+    const isCancelling =
+      body.status === "cancelled" &&
+      existing.status !== "cancelled" &&
+      (existing.status === "confirmed" || existing.payment_status === "paid");
+
+    if (isCancelling) {
+      type OrderItem = { variantId?: string; quantity: number };
+      const items = (existing.items_json ?? []) as OrderItem[];
+
+      const stockRestores = items
+        .filter((i) => i.variantId)
+        .map((i) =>
+          db.variant.update({
+            where: { id: i.variantId! },
+            data: { stock: { increment: i.quantity } },
+          }),
+        );
+
+      const [order] = await db.$transaction([
+        db.order.update({
+          where: { id },
+          data: {
+            status: "cancelled",
+            ...(body.payment_status && { payment_status: body.payment_status }),
+          },
+        }),
+        ...stockRestores,
+      ]);
+
+      return NextResponse.json(order);
+    }
+
     const order = await db.order.update({
         where: { id },
         data: {

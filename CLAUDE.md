@@ -56,3 +56,5 @@ npm run dev
 Local stores: `localhost:3000` (Tech Store) · `localhost:3001` (Fashion Hub)
 Admin: `/admin/login` · Super admin: `/superadmin`
 Seed credentials: `admin@techstore.com` / `admin123`
+
+graphify: Knowledge graph exists. Read GRAPH_REPORT.md for god nodes and community structure before searching raw files.
