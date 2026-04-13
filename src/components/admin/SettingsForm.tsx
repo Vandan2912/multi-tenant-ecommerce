@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Tenant, StoreConfig } from "@prisma/client";
+import type { ShippingConfig } from "@/lib/shipping";
 
 type Props = {
     tenant: Tenant;
@@ -13,6 +14,7 @@ export function SettingsForm({ tenant, config }: Props) {
     const router = useRouter();
     const features = (config?.features_json ?? {}) as Record<string, boolean>;
     const contact = (config?.contact_json ?? {}) as Record<string, string>;
+    const shipping = (config?.shipping_json ?? { type: "free" }) as ShippingConfig;
 
     const [fields, setFields] = useState({
         storeName: tenant.name,
@@ -28,6 +30,9 @@ export function SettingsForm({ tenant, config }: Props) {
         enableCOD: features.enableCOD ?? true,
         enableWishlist: features.enableWishlist ?? false,
         enableCoupons: features.enableCoupons ?? false,
+        shippingType: shipping.type ?? "free",
+        shippingFlatRate: String(shipping.flat_rate ?? 99),
+        shippingFreeAbove: String(shipping.free_above ?? ""),
     });
 
     const [loading, setLoading] = useState(false);
@@ -208,6 +213,57 @@ export function SettingsForm({ tenant, config }: Props) {
                     value={fields.enableWishlist} onChange={(v) => set("enableWishlist", v)} />
                 <Toggle label="Coupons" desc="Enable discount coupon codes at checkout"
                     value={fields.enableCoupons} onChange={(v) => set("enableCoupons", v)} />
+            </section>
+
+            {/* Shipping */}
+            <section className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
+                <h2 className="font-semibold text-gray-800">Shipping</h2>
+                <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
+                        Shipping Type
+                    </label>
+                    <select
+                        value={fields.shippingType}
+                        onChange={(e) => set("shippingType", e.target.value)}
+                        className={inputClass}
+                    >
+                        <option value="free">Always Free</option>
+                        <option value="flat_rate">Flat Rate</option>
+                    </select>
+                </div>
+                {fields.shippingType === "flat_rate" && (
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
+                                Flat Rate (₹)
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                value={fields.shippingFlatRate}
+                                onChange={(e) => set("shippingFlatRate", e.target.value)}
+                                placeholder="99"
+                                className={inputClass}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">
+                                Free Above (₹) — optional
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                value={fields.shippingFreeAbove}
+                                onChange={(e) => set("shippingFreeAbove", e.target.value)}
+                                placeholder="e.g. 500"
+                                className={inputClass}
+                            />
+                            <p className="text-xs text-gray-400 mt-1">
+                                Leave blank to always charge the flat rate
+                            </p>
+                        </div>
+                    </div>
+                )}
             </section>
 
             {/* Save */}

@@ -3,6 +3,8 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import { validatePromoCode, recordPromoUsage } from "@/lib/promo";
+import { calculateShipping } from "@/lib/shipping";
+import type { ShippingConfig } from "@/lib/shipping";
 
 const orderSchema = z.object({
   items: z.array(z.object({
@@ -125,8 +127,9 @@ export async function POST(req: NextRequest) {
 
     // ── Calculate total ──────────────────────────────────
     const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-    const shipping = isFreeShipping ? 0 : 0; // your shipping logic here
-    const total = Math.max(0, subtotal - promoDiscount + shipping);
+    const shippingConfig = (tenant.storeConfig?.shipping_json ?? null) as ShippingConfig | null;
+    const shippingCost = calculateShipping(shippingConfig, subtotal, isFreeShipping);
+    const total = Math.max(0, subtotal - promoDiscount + shippingCost);
 
     // ── Upsert customer ──────────────────────────────────
     let customerRecord = null;
@@ -188,6 +191,7 @@ export async function POST(req: NextRequest) {
       total,
       subtotal,
       promoDiscount,
+      shippingCost,
       isFreeShipping,
       paymentMethod,
     });

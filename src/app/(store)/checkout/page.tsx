@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { RazorpayButton } from "@/components/RazorpayButton";
 import { PromoInput } from "@/components/PromoInput";
+import { calculateShipping } from "@/lib/shipping";
+import type { ShippingConfig } from "@/lib/shipping";
 
 type Field = {
   name: string;
@@ -41,8 +43,7 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [primaryColor, setPrimaryColor] = useState("#2563EB");
   const [enableCOD, setEnableCOD] = useState(true);
-  // todo: fetch from store to enable COD
-  console.log(setEnableCOD);
+  const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
 
   type PromoResult = {
     promoCodeId: string;
@@ -57,14 +58,24 @@ export default function CheckoutPage() {
 
   const promoDiscount = appliedPromo?.discount ?? 0;
   const isFreeShipping = appliedPromo?.isFreeShipping ?? false;
-  const shipping = isFreeShipping ? 0 : 0; // your shipping logic
-  const finalTotal = Math.max(0, total - promoDiscount + shipping);
+  const shippingCost = calculateShipping(shippingConfig, total, isFreeShipping);
+  const finalTotal = Math.max(0, total - promoDiscount + shippingCost);
 
   useEffect(() => {
     const color = getComputedStyle(document.documentElement)
       .getPropertyValue("--color-primary")
       .trim();
     if (color) setPrimaryColor(color);
+
+    fetch("/api/store-config")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.shipping) setShippingConfig(data.shipping);
+        if (typeof data.features?.enableCOD === "boolean") {
+          setEnableCOD(data.features.enableCOD);
+        }
+      })
+      .catch(() => {/* use defaults */});
   }, []);
 
   if (items.length === 0) {
@@ -399,18 +410,14 @@ export default function CheckoutPage() {
                 <span>-₹{promoDiscount.toLocaleString("en-IN")}</span>
               </div>
             )}
-            {appliedPromo?.isFreeShipping && (
-              <div className="flex justify-between text-green-600 font-medium">
-                <span>Shipping</span>
-                <span>Free</span>
-              </div>
-            )}
-            {!appliedPromo?.isFreeShipping && (
-              <div className="flex justify-between text-gray-500">
-                <span>Shipping</span>
+            <div className="flex justify-between text-gray-500">
+              <span>Shipping</span>
+              {shippingCost === 0 ? (
                 <span className="text-green-600 font-medium">Free</span>
-              </div>
-            )}
+              ) : (
+                <span>₹{shippingCost.toLocaleString("en-IN")}</span>
+              )}
+            </div>
             <div className="border-t border-gray-100 pt-2 flex justify-between font-bold text-gray-800 text-base">
               <span>Total</span>
               <span>₹{finalTotal.toLocaleString("en-IN")}</span>
@@ -437,7 +444,7 @@ export default function CheckoutPage() {
                 image: i.image,
                 variant: i.variant,
               }))}
-              total={total}
+              total={finalTotal}
               customer={{
                 name: fields.name,
                 email: fields.email,

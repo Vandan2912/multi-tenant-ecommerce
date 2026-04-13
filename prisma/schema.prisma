@@ -42,6 +42,7 @@ model StoreConfig {
   contact_json       Json?
   seo_json           Json?
   razorpay_key_id    String?
+  shipping_json      Json?
 
   tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 }
