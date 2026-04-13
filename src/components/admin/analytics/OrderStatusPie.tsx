@@ -41,14 +41,11 @@ export function OrderStatusPie({ data }: { data: DataPoint[] }) {
           dataKey="value"
         >
           {data.map((entry, index) => (
-            <Cell
-              key={index}
-              fill={STATUS_COLORS[entry.name] ?? "#6b7280"}
-            />
+            <Cell key={index} fill={STATUS_COLORS[entry.name] ?? "#6b7280"} />
           ))}
         </Pie>
         <Tooltip
-          formatter={(value: number, name: string) => [value, name]}
+          formatter={(value: any, name: any) => [value, name]}
           contentStyle={{
             fontSize: 12,
             borderRadius: 8,

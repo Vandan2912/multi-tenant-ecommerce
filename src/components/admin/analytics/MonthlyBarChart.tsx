@@ -16,7 +16,11 @@ export function MonthlyBarChart({ data }: { data: DataPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 10 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+        <CartesianGrid
+          strokeDasharray="3 3"
+          stroke="#f0f0f0"
+          vertical={false}
+        />
         <XAxis
           dataKey="month"
           tick={{ fontSize: 11, fill: "#9ca3af" }}
@@ -33,10 +37,8 @@ export function MonthlyBarChart({ data }: { data: DataPoint[] }) {
           width={52}
         />
         <Tooltip
-          formatter={(value: number, name: string) => [
-            name === "revenue"
-              ? `₹${value.toLocaleString("en-IN")}`
-              : value,
+          formatter={(value: any, name: any) => [
+            name === "revenue" ? `₹${Number(value).toLocaleString("en-IN")}` : value,
             name === "revenue" ? "Revenue" : "Orders",
           ]}
           contentStyle={{

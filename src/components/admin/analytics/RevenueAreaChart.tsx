@@ -40,7 +40,7 @@ export function RevenueAreaChart({ data }: { data: DataPoint[] }) {
           width={52}
         />
         <Tooltip
-          formatter={(value: number) => [
+          formatter={(value: any) => [
             `₹${value.toLocaleString("en-IN")}`,
             "Revenue",
           ]}

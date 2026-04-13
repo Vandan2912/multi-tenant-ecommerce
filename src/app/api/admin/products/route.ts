@@ -2,6 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
+interface VariantInput {
+  name: string;
+  sku?: string | null;
+  price: number;
+  discount_price?: number | null;
+  stock?: number;
+  unit?: string;
+  options_json?: Record<string, string>;
+  is_active?: boolean;
+}
+
+interface ProductOptionInput {
+  option_type_id: string;
+  position?: number;
+  selected_values_json?: string[];
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.tenantId)
@@ -21,7 +38,7 @@ export async function POST(req: NextRequest) {
       specs_json: body.specs_json ?? {},
       is_active: body.is_active ?? true,
       variants: {
-        create: (body.variants ?? []).map((v: any) => ({
+        create: (body.variants ?? []).map((v: VariantInput) => ({
           tenant_id: tenantId,
           name: v.name,
           sku: v.sku ?? null,
@@ -34,7 +51,7 @@ export async function POST(req: NextRequest) {
         })),
       },
       productOptions: {
-        create: (body.productOptions ?? []).map((po: any) => ({
+        create: (body.productOptions ?? []).map((po: ProductOptionInput) => ({
           tenant_id: tenantId,
           option_type_id: po.option_type_id,
           position: po.position ?? 0,

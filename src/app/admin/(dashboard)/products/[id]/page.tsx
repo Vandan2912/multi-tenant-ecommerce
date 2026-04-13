@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect, notFound } from "next/navigation";
 import { ProductForm } from "@/components/admin/ProductForm";
+import { OptionValueMeta } from "@/lib/options";
 
 export default async function EditProductPage({
   params,
@@ -47,7 +48,7 @@ export default async function EditProductPage({
       <ProductForm
         categories={categories}
         brands={brands}
-        optionTypes={optionTypes.map((o) => ({ ...o, values_json: o.values_json as any[] }))}
+        optionTypes={optionTypes.map((o) => ({ ...o, values_json: o.values_json as OptionValueMeta[] }))}
         mode="edit"
         initialData={{
           id: product.id,
@@ -78,7 +79,7 @@ export default async function EditProductPage({
             selected_values_json: po.selected_values_json as string[],
             optionType: {
               ...po.optionType,
-              values_json: po.optionType.values_json as any[],
+              values_json: po.optionType.values_json as OptionValueMeta[],
             },
           })),
         }}
