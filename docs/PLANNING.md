@@ -1,62 +1,101 @@
-# 🚀 What's Missing — Next Feature Candidates
+# Storefront Customization Plan
 
-## 🥇 Tier 1 — High Impact, Core Commerce Gaps
+Here's the state of the art and a plan to make the storefront fully customizable per tenant.
 
-| #   | Feature                          | Why                                                                                                                                                                                                     |
-| --- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Order Tracking for Customers** | Customers have zero visibility after checkout — no way to check order status. The order-confirmed page is a dead end. Need a `/orders/track` page where customers enter order ID + phone to see status. |
-| 2   | **Stock Decrement on Order**     | Orders are created but stock is never decremented on variants. A product can be "sold" infinite times. Critical bug for any live store.                                                                 |
-| 3   | **Wishlist**                     | `features_json` already has `enableWishlist` flag but nothing implements it. localStorage-based wishlist with heart icon on product cards.                                                              |
-| 4   | **Admin Analytics Dashboard**    | The admin dashboard page exists but needs real stats — revenue, orders over time, top products, low stock alerts.                                                                                       |
+## What's already in place
+
+StoreConfig row per tenant stores:
+
+- primary_color
+- font_family
+- hero_layout
+- product_card_style
+- logo_url
+- store_tagline
+- features_json
+- contact_json
+- seo_json
+- shipping_json
+- razorpay_key_id
+
+But only a subset is actually wired to the storefront:
+
+- primary_color
+- font_family
+- logo_url
+- tagline
+- SEO
+- shipping
+- features
+
+The `hero_layout` and `product_card_style` enums are saved but never consumed.
+
+Everything else in the storefront (hero content, sections, navbar items, footer, typography scale, button style, page copy) is hardcoded.
+
+## The gap
+
+The goal is **"every store can set everything."**
+
+Today a tenant can only skin the store:
+
+- colors
+- logo
+- font
+- tagline
+
+They **cannot change**:
+
+- structure (sections, layout)
+- content (hero copy, CTAs, footer links, custom pages)
+- component style (cards, buttons, radii)
 
 ---
 
-## 🧩 Tier 2 — Business Enablers
+## Phased plan
 
-| #   | Feature                       | Why                                                                                                                              |
-| --- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| 5   | **Email Notifications**       | Order confirmation email to customer, new order alert to admin. No notifications exist currently.                                |
-| 6   | **Shipping Calculation**      | Shipping is hardcoded to ₹0 everywhere (`const shipping = isFreeShipping ? 0 : 0`). Need configurable shipping rates per tenant. |
-| 7   | **Product Reviews / Ratings** | Social proof — critical for conversion in Indian e-commerce.                                                                     |
-| 8   | **Inventory Alerts**          | Admin notification when stock drops below threshold.                                                                             |
+### Phase 1 — Finish what's half-built (1–2 days)
 
----
+Make the existing fields actually render.
 
-## ✨ Tier 3 — Growth & Polish
-
-| #   | Feature                                       | Why                                                                     |
-| --- | --------------------------------------------- | ----------------------------------------------------------------------- |
-| 9   | **SEO (meta tags, sitemap, structured data)** | `seo_json` exists in `StoreConfig` but isn't wired to `<head>`.         |
-| 10  | **WhatsApp Order Notifications**              | Indian market standard — `contact_json` already has a `whatsapp` field. |
-| 11  | **Related Products**                          | Same-category product suggestions on product detail page.               |
-| 12  | **Bulk Product Import (CSV)**                 | Admin time-saver for stores with large catalogs.                        |
+- `hero_layout`: implement split and fullscreen variants in `src/app/(store)/page.tsx`
+- `product_card_style`: implement minimal / detailed / grid-dense variants in product card component
+- Apply `primary_color` consistently (buttons, links, accents via CSS variables already in layout)
 
 ---
 
-## 💡 Recommendation
+### Phase 2 — Theme tokens (2–3 days)
 
-Start with:
+Expand StoreConfig into a full token set:
 
-### 1. Stock Decrement (#2)
+- **Colors**: primary, secondary, accent, text, background, muted
+- **Typography**: heading_font, body_font, base font_scale (compact/normal/large)
+- **Shape**: border_radius (sharp/rounded/pill), button_style (solid/outline/ghost)
+- **Layout density**: container_width, section_spacing
 
-- Data integrity fix
-- Must-have before going live
-- Small scope (touches `api/orders/route.ts` + payment webhook)
+Store as a single `theme_json` blob.
 
-### 2. Order Tracking (#1)
+Expose all tokens as CSS variables in `(store)/layout.tsx`.
 
-- Highest customer-facing impact
-- Completes purchase → delivery loop
-- Self-contained, no external services required
+Build a **Theme admin tab** with live preview:
+
+- iframe pointing to `/?preview=<token-override>`
 
 ---
 
-## 👉 Next Step
+### Phase 3 — Content blocks / page builder (4–6 days)
 
-Which feature(s) do you want to build?
+Move homepage from hardcoded JSX → block list stored in:
 
-I can:
+`storeConfig.homepage_json`
 
-- Break it into **DB schema + API + UI**
-- Give **production-ready code**
-- Or design it like **Shopify-level architecture**
+```js
+blocks: [
+  { type: "hero", variant, headline, subheadline, cta_text, cta_href, image_url },
+  { type: "featured_products", title, product_ids, limit },
+  { type: "categories_grid", category_ids },
+  { type: "image_banner", image_url, link },
+  { type: "text", markdown },
+  { type: "testimonials", items: [...] },
+  { type: "newsletter" },
+]
+```
