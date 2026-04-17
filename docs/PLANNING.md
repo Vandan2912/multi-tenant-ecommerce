@@ -1,101 +1,136 @@
-# Storefront Customization Plan
-
-Here's the state of the art and a plan to make the storefront fully customizable per tenant.
-
-## What's already in place
-
-StoreConfig row per tenant stores:
-
-- primary_color
-- font_family
-- hero_layout
-- product_card_style
-- logo_url
-- store_tagline
-- features_json
-- contact_json
-- seo_json
-- shipping_json
-- razorpay_key_id
-
-But only a subset is actually wired to the storefront:
-
-- primary_color
-- font_family
-- logo_url
-- tagline
-- SEO
-- shipping
-- features
-
-The `hero_layout` and `product_card_style` enums are saved but never consumed.
-
-Everything else in the storefront (hero content, sections, navbar items, footer, typography scale, button style, page copy) is hardcoded.
-
-## The gap
-
-The goal is **"every store can set everything."**
-
-Today a tenant can only skin the store:
-
-- colors
-- logo
-- font
-- tagline
-
-They **cannot change**:
-
-- structure (sections, layout)
-- content (hero copy, CTAs, footer links, custom pages)
-- component style (cards, buttons, radii)
+This is the biggest feature yet — let me plan it thoroughly before any code. A page builder done wrong is a nightmare. Done right, it's the core differentiator of your platform.
 
 ---
 
-## Phased plan
+## The Vision
 
-### Phase 1 — Finish what's half-built (1–2 days)
-
-Make the existing fields actually render.
-
-- `hero_layout`: implement split and fullscreen variants in `src/app/(store)/page.tsx`
-- `product_card_style`: implement minimal / detailed / grid-dense variants in product card component
-- Apply `primary_color` consistently (buttons, links, accents via CSS variables already in layout)
+Every store owner can customize their **entire storefront** from the admin — no code, no developer needed. They drag sections around, pick styles, and hit publish. The page is stored as a JSON document in the database and rendered on the storefront dynamically.
 
 ---
 
-### Phase 2 — Theme tokens (2–3 days)
+## Architecture Decision
 
-Expand StoreConfig into a full token set:
+**Two approaches exist:**
 
-- **Colors**: primary, secondary, accent, text, background, muted
-- **Typography**: heading_font, body_font, base font_scale (compact/normal/large)
-- **Shape**: border_radius (sharp/rounded/pill), button_style (solid/outline/ghost)
-- **Layout density**: container_width, section_spacing
+| Approach                       | How it works                                                                                                                         | Tradeoff                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| **Block-based** (like Shopify) | Page = ordered list of pre-built section blocks. Each block has a type + config. Admin picks blocks, configures them, reorders them. | Simple to build, easy for non-technical users, less flexible |
+| **Free-form** (like Webflow)   | Full drag-drop canvas with absolute positioning, custom CSS, nested grids                                                            | Complex to build, intimidating for small business owners     |
 
-Store as a single `theme_json` blob.
-
-Expose all tokens as CSS variables in `(store)/layout.tsx`.
-
-Build a **Theme admin tab** with live preview:
-
-- iframe pointing to `/?preview=<token-override>`
+**I recommend Block-based.** Your users are small business owners — they want to pick a hero style, change the color, upload an image, and be done. They don't want a design tool.
 
 ---
 
-### Phase 3 — Content blocks / page builder (4–6 days)
+## What Gets a Builder
 
-Move homepage from hardcoded JSX → block list stored in:
+| Page               | Customizable Sections                                                                  |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| **Homepage**       | Hero, Featured Products, Categories Grid, Testimonials, Banner, CTA, Custom Text/Image |
+| **Product List**   | Header style, Product Card style, Sidebar layout, Filter position                      |
+| **Product Detail** | Image layout, Info layout, Related products, Breadcrumb style                          |
+| **Header**         | Logo position, Nav style, Search bar, Cart icon, Announcement bar                      |
+| **Footer**         | Columns, Links, Social icons, Newsletter, Copyright                                    |
+| **Custom Pages**   | About, Contact, FAQ, Policies — full block builder                                     |
 
-`storeConfig.homepage_json`
+---
 
-```js
-blocks: [
-  { type: "hero", variant, headline, subheadline, cta_text, cta_href, image_url },
-  { type: "featured_products", title, product_ids, limit },
-  { type: "categories_grid", category_ids },
-  { type: "image_banner", image_url, link },
-  { type: "text", markdown },
-  { type: "testimonials", items: [...] },
-  { type: "newsletter" },
+## Data Model
+
+```txt
+PageConfig (per tenant, per page type)
+  id, tenant_id, page_type, title, slug, sections_json, is_published
+
+sections_json = [
+  {
+    id: "hero-1",
+    type: "hero",
+    position: 0,
+    config: {
+      layout: "centered",
+      title: "Welcome to our store",
+      subtitle: "Best products at best prices",
+      buttonText: "Shop Now",
+      buttonLink: "/products",
+      backgroundImage: "https://...",
+      overlayOpacity: 40,
+      height: "large"
+    }
+  }
 ]
 ```
+
+---
+
+## Section Types — Full Registry
+
+```txt
+LAYOUT SECTIONS
+hero
+banner
+spacer
+divider
+columns
+
+PRODUCT SECTIONS
+featured_products
+product_carousel
+category_grid
+brand_showcase
+new_arrivals
+on_sale
+
+CONTENT SECTIONS
+rich_text
+image
+image_gallery
+video
+testimonials
+faq
+newsletter
+contact_info
+custom_html
+```
+
+---
+
+## Build Phases
+
+### Phase A — Foundation
+
+1. Database: PageConfig model + migration
+2. Section type registry + config schemas
+3. Section renderer components
+4. Store layout reads PageConfig
+5. Admin basic page editor
+
+### Phase B — Builder UX
+
+6. Drag-and-drop reordering
+7. Live preview panel
+8. Section config forms
+9. Image picker integration
+10. Product/category picker modals
+
+### Phase C — Global Customization
+
+11. Header builder
+12. Footer builder
+13. Product card style editor
+14. Product detail layout editor
+15. Breadcrumb style editor
+
+### Phase D — Advanced
+
+16. Page versioning
+17. Undo/redo
+18. Custom pages
+19. Mobile preview toggle
+20. Section templates
+
+---
+
+## Confirm Before We Start
+
+This is a 4-phase build. Phase A alone is substantial.
+
+**Should I start with Phase A now?**

@@ -26,6 +26,7 @@ model Tenant {
   adminUsers  AdminUser[]
   optionTypes OptionType[]
   promoCodes  PromoCode[]
+  pageConfigs PageConfig[]
 }
 
 // ── Store Config ───────────────────────────────────────────
@@ -245,6 +246,25 @@ model PromoCode {
   @@unique([tenant_id, code])
   @@index([tenant_id])
   @@index([tenant_id, is_active])
+}
+
+// ── Page Config (page builder per tenant, per page type) ──
+model PageConfig {
+  id            String   @id @default(uuid())
+  tenant_id     String
+  page_type     String   // home | product_list | product_detail | header | footer | custom
+  slug          String   // "home" or custom page slug like "about"
+  title         String
+  sections_json Json     @default("[]")
+  is_published  Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, slug])
+  @@index([tenant_id])
+  @@index([tenant_id, page_type])
 }
 
 // ── Promo Usage tracking (per user) ───────────────────────
